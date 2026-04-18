@@ -3,6 +3,12 @@ import {
   type Ingredient,
   EMPTY_COMPOSITION,
 } from "./types";
+import {
+  calculateFormulaComponents,
+  calculateMassBalance,
+  componentsToPercent,
+  compositionSimilarity,
+} from "./solver";
 
 const now = () => new Date().toISOString();
 
@@ -415,6 +421,21 @@ export function createSeedData(): ProjectData {
       updatedAt: now(),
     },
   ];
+
+  // Recalculate formula components from ingredients
+  for (const formula of data.formulas) {
+    formula.calculatedComponents = calculateFormulaComponents(
+      formula.ingredientLines,
+      data.ingredients
+    );
+    formula.massBalance = calculateMassBalance(
+      formula.ingredientLines,
+      formula.targetMassG
+    );
+    const pct = componentsToPercent(formula.calculatedComponents);
+    formula.confidence =
+      compositionSimilarity(pct, data.targetProduct.targetComposition) / 100;
+  }
 
   return data;
 }
