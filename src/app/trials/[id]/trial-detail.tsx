@@ -24,8 +24,9 @@ import type {
   TrialMeasurement,
   ScoringDimension,
 } from "@/lib/types";
+import { COMPONENT_KEYS, COMPONENT_LABELS } from "@/lib/types";
 import { statusColor } from "@/lib/utils";
-import { calculateSimilarityScore } from "@/lib/solver";
+import { calculateSimilarityScore, calculateFormulaComponents, componentsToPercent, checkCompliance } from "@/lib/solver";
 import {
   RadarChart,
   PolarGrid,
@@ -222,6 +223,7 @@ export default function TrialDetailClient({ id }: { id: string }) {
           <TabsTrigger value="measurements">Measurements</TabsTrigger>
           <TabsTrigger value="parameters">Parameters</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
+          <TabsTrigger value="deviations">Deviations</TabsTrigger>
         </TabsList>
 
         {/* Scoring */}
@@ -481,6 +483,115 @@ export default function TrialDetailClient({ id }: { id: string }) {
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Deviations */}
+        <TabsContent value="deviations">
+          {!formula ? (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">
+                  No formula linked to this trial.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (() => {
+            const trialComps = calculateFormulaComponents(formula.ingredientLines, data.ingredients);
+            const trialPct = componentsToPercent(trialComps);
+            const compliance = checkCompliance(trialPct, data.targetProduct.targetComposition);
+            const significantDeviations = compliance.deviations.length;
+
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Overall Compliance Status */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Overall Compliance</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-col items-center gap-3">
+                      <span
+                        className={`inline-flex items-center px-4 py-2 rounded-full text-lg font-semibold ${
+                          compliance.status === "compliant"
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            : compliance.status === "warning"
+                            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                        }`}
+                      >
+                        {compliance.status === "compliant"
+                          ? "✓ Compliant"
+                          : compliance.status === "warning"
+                          ? "⚠ Warning"
+                          : "✗ Non-compliant"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-2">
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Max Deviation</p>
+                        <p className="text-xl font-bold">{compliance.maxDeviation.toFixed(1)}%</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Components &gt; 2%</p>
+                        <p className="text-xl font-bold">{significantDeviations}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Component Deviations */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Component Deviations</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-5 gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 pb-1 border-b">
+                        <span>Component</span>
+                        <span className="text-right">Formula</span>
+                        <span className="text-right">Target</span>
+                        <span className="text-right">Diff</span>
+                        <span className="text-right">Status</span>
+                      </div>
+                      {COMPONENT_KEYS.map((key) => {
+                        const formulaVal = trialPct[key];
+                        const targetVal = data.targetProduct.targetComposition[key];
+                        const diff = formulaVal - targetVal;
+                        const absDiff = Math.abs(diff);
+                        const direction = diff > 0 ? "over" : "under";
+
+                        return (
+                          <div key={key} className="grid grid-cols-5 gap-2 text-sm items-center py-1">
+                            <span className="font-medium truncate">{COMPONENT_LABELS[key]}</span>
+                            <span className="text-right">{formulaVal.toFixed(1)}%</span>
+                            <span className="text-right">{targetVal.toFixed(1)}%</span>
+                            <span className="text-right">
+                              {diff >= 0 ? "+" : ""}{diff.toFixed(1)}%
+                            </span>
+                            <span className="text-right">
+                              {absDiff <= 2 ? (
+                                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                                  OK
+                                </Badge>
+                              ) : absDiff <= 5 ? (
+                                <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-xs">
+                                  {absDiff.toFixed(1)}% {direction}
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs">
+                                  {absDiff.toFixed(1)}% {direction}
+                                </Badge>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()}
         </TabsContent>
       </Tabs>
     </div>
