@@ -33,7 +33,8 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { Trophy, TrendingUp, BarChart3, Table } from "lucide-react";
+import { Trophy, TrendingUp, BarChart3, Table, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function AnalysisPage() {
   const { data } = useStore();
@@ -186,13 +187,39 @@ export default function AnalysisPage() {
 
   const reasoning = generateReasoning();
 
+  function exportCSV() {
+    const header = ["Rank","Trial Run","Formula","Protocol","Composition Score","Outcome Score","Combined Score"];
+    const rows = rankingRows.map((row) => [
+      row.rank,
+      row.trial.runNumber,
+      row.formula?.name || "",
+      row.protocol?.name || "",
+      row.compositionScore.toFixed(1),
+      row.outcomeScore.toFixed(1),
+      row.combinedScore.toFixed(1),
+    ]);
+    const csv = [header, ...rows].map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "trial-rankings.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Analysis</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Comparison, ranking, and insights
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Analysis</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Comparison, ranking, and insights
+          </p>
+        </div>
+        <Button variant="outline" onClick={exportCSV} disabled={rankingRows.length === 0}>
+          <Download className="h-4 w-4 mr-1" /> Export Report
+        </Button>
       </div>
 
       <Tabs defaultValue="ranking">
