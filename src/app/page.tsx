@@ -1,65 +1,369 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useStore } from "@/lib/store";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import {
+  Target,
+  Leaf,
+  FlaskConical,
+  ListChecks,
+  TestTube,
+  BarChart3,
+  Trophy,
+  TrendingUp,
+  AlertTriangle,
+} from "lucide-react";
+import {
+  calculateFormulaComponents,
+  componentsToPercent,
+  calculateSimilarityScore,
+  rankTrials,
+} from "@/lib/solver";
+import {
+  COMPONENT_KEYS,
+  COMPONENT_LABELS,
+} from "@/lib/types";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
+
+export default function DashboardPage() {
+  const { data } = useStore();
+  const { targetProduct, ingredients, formulas, protocols, trials } = data;
+
+  const rankings = rankTrials(trials, formulas, ingredients, targetProduct);
+  const bestRanking = rankings[0];
+  const bestTrial = bestRanking
+    ? trials.find((t) => t.id === bestRanking.trialId)
+    : null;
+  const bestFormula = bestTrial
+    ? formulas.find((f) => f.id === bestTrial.formulaId)
+    : null;
+
+  const gapData = formulas.length > 0
+    ? COMPONENT_KEYS.map((key) => {
+        const label = COMPONENT_LABELS[key];
+        const targetVal = targetProduct.targetComposition[key];
+        const bestFormulaComps = bestFormula
+          ? componentsToPercent(
+              calculateFormulaComponents(
+                bestFormula.ingredientLines,
+                ingredients
+              )
+            )
+          : null;
+        return {
+          name: label,
+          Target: targetVal,
+          Best: bestFormulaComps ? bestFormulaComps[key] : 0,
+        };
+      })
+    : [];
+
+  const trialHistory = trials
+    .filter((t) => t.status === "completed")
+    .sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    )
+    .map((t) => ({
+      name: `Run #${t.runNumber}`,
+      score: t.similarityScore || calculateSimilarityScore(t),
+    }));
+
+  const hasTarget = targetProduct.name.length > 0;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {data.project.name}
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Recipe Reverse Engineering Dashboard
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          icon={<Target className="h-5 w-5 text-indigo-600" />}
+          label="Target"
+          value={hasTarget ? targetProduct.name : "Not set"}
+          href="/target"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        <StatCard
+          icon={<Leaf className="h-5 w-5 text-green-600" />}
+          label="Ingredients"
+          value={String(ingredients.length)}
+          href="/ingredients"
+        />
+        <StatCard
+          icon={<FlaskConical className="h-5 w-5 text-purple-600" />}
+          label="Formulas"
+          value={String(formulas.length)}
+          href="/formulas"
+        />
+        <StatCard
+          icon={<TestTube className="h-5 w-5 text-orange-600" />}
+          label="Trials"
+          value={String(trials.length)}
+          href="/trials"
+        />
+      </div>
+
+      {!hasTarget && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="pt-6 flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-800">
+                Get started by defining your target product
+              </p>
+              <p className="text-xs text-amber-600 mt-0.5">
+                Set up the product you want to reverse-engineer, then add
+                ingredients and build candidate formulas.
+              </p>
+            </div>
+            <Link href="/target" className="ml-auto">
+              <Button size="sm">Set Target</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-amber-500" />
+              Best Current Clone
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {bestTrial && bestRanking ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    Trial #{bestTrial.runNumber}
+                  </span>
+                  <Badge variant="secondary">
+                    Score: {bestRanking.combinedScore.toFixed(1)}%
+                  </Badge>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Composition Match</span>
+                    <span>{bestRanking.compositionScore.toFixed(1)}%</span>
+                  </div>
+                  <Progress value={bestRanking.compositionScore} />
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Outcome Score</span>
+                    <span>{bestRanking.outcomeScore.toFixed(1)}%</span>
+                  </div>
+                  <Progress value={bestRanking.outcomeScore} />
+                </div>
+                {bestFormula && (
+                  <p className="text-xs text-gray-500">
+                    Formula: {bestFormula.name}
+                  </p>
+                )}
+                <Link href={`/trials/${bestTrial.id}`}>
+                  <Button variant="outline" size="sm" className="mt-2">
+                    View Trial
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">
+                No completed trials yet. Run your first experiment!
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-indigo-500" />
+              Composition Gap
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {gapData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={gapData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="Target" fill="#6366f1" />
+                  <Bar dataKey="Best" fill="#10b981" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-gray-400">
+                Add formulas to see composition comparison.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-green-500" />
+              Trial History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {trialHistory.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={trialHistory}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Bar dataKey="score" fill="#f59e0b" name="Similarity %" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-sm text-gray-400">
+                Complete trials to see progress over time.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Link href="/formulas" className="block">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <FlaskConical className="h-4 w-4" />
+                Create New Formula
+              </Button>
+            </Link>
+            <Link href="/protocols" className="block">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <ListChecks className="h-4 w-4" />
+                Design Protocol
+              </Button>
+            </Link>
+            <Link href="/trials" className="block">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <TestTube className="h-4 w-4" />
+                Log Trial
+              </Button>
+            </Link>
+            <Link href="/analysis" className="block">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <BarChart3 className="h-4 w-4" />
+                View Analysis
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+
+      {protocols.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ListChecks className="h-4 w-4 text-blue-500" />
+              Protocols Overview
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="pb-2 font-medium">Protocol</th>
+                    <th className="pb-2 font-medium">Category</th>
+                    <th className="pb-2 font-medium">Steps</th>
+                    <th className="pb-2 font-medium">Trials</th>
+                    <th className="pb-2 font-medium">Best Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {protocols.map((p) => {
+                    const pTrials = trials.filter(
+                      (t) => t.protocolId === p.id
+                    );
+                    const best = pTrials.reduce(
+                      (max, t) =>
+                        t.similarityScore > max ? t.similarityScore : max,
+                      0
+                    );
+                    return (
+                      <tr key={p.id} className="border-b last:border-0">
+                        <td className="py-2">
+                          <Link
+                            href={`/protocols/${p.id}`}
+                            className="text-indigo-600 hover:underline"
+                          >
+                            {p.name}
+                          </Link>
+                        </td>
+                        <td className="py-2">
+                          <Badge variant="outline">{p.category}</Badge>
+                        </td>
+                        <td className="py-2">{p.steps.length}</td>
+                        <td className="py-2">{pTrials.length}</td>
+                        <td className="py-2">
+                          {best > 0 ? `${best}%` : "\u2014"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  href,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  href: string;
+}) {
+  return (
+    <Link href={href}>
+      <Card className="hover:border-gray-300 transition-colors cursor-pointer">
+        <CardContent className="pt-4 pb-4 flex items-center gap-3">
+          {icon}
+          <div>
+            <p className="text-xs text-gray-500">{label}</p>
+            <p className="text-lg font-semibold text-gray-900 truncate">
+              {value}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }

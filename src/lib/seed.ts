@@ -1,13 +1,6 @@
 import {
   type ProjectData,
   type Ingredient,
-  type Formula,
-  type Protocol,
-  type Trial,
-  type TargetProduct,
-  type Note,
-  type Attachment,
-  type ScoringProfile,
   EMPTY_COMPOSITION,
 } from "./types";
 

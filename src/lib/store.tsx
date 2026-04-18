@@ -5,7 +5,6 @@ import {
   useContext,
   useState,
   useCallback,
-  useEffect,
   type ReactNode,
 } from "react";
 import type {
@@ -17,13 +16,11 @@ import type {
   TargetProduct,
   Note,
   Attachment,
-  FormulaLine,
 } from "./types";
 import { createSeedData } from "./seed";
 import {
   calculateFormulaComponents,
   calculateMassBalance,
-  calculateSimilarityScore,
 } from "./solver";
 
 const STORAGE_KEY = "recipe-reverse-eng-project";
@@ -89,13 +86,8 @@ interface StoreContextValue {
 const StoreContext = createContext<StoreContextValue | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<ProjectData>(() => createSeedData());
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    setData(loadData());
-    setLoaded(true);
-  }, []);
+  const [data, setData] = useState<ProjectData>(loadData);
+  const [loaded] = useState(() => typeof window !== "undefined");
 
   const persist = useCallback((next: ProjectData) => {
     setData(next);
