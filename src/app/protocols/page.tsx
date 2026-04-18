@@ -94,8 +94,8 @@ export default function ProtocolsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Protocol Lab</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Protocol Lab</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {data.protocols.length} protocol
             {data.protocols.length !== 1 ? "s" : ""} defined
           </p>
@@ -108,8 +108,8 @@ export default function ProtocolsPage() {
 
       {data.protocols.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-sm text-gray-400">
-            <ListChecks className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+          <CardContent className="py-12 text-center text-sm text-gray-400 dark:text-gray-500">
+            <ListChecks className="h-8 w-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
             <p>No protocols defined yet.</p>
             <p className="mt-1">Create your first manufacturing protocol.</p>
           </CardContent>
@@ -121,11 +121,11 @@ export default function ProtocolsPage() {
               (t) => t.protocolId === p.id
             ).length;
             return (
-              <Card key={p.id} className="hover:border-gray-300 transition-colors">
+              <Card key={p.id} className="hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <Link href={`/protocols/${p.id}`}>
-                      <CardTitle className="text-base text-indigo-600 hover:underline cursor-pointer">
+                      <CardTitle className="text-base text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer">
                         {p.name}
                       </CardTitle>
                     </Link>
@@ -141,7 +141,7 @@ export default function ProtocolsPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-red-500"
+                        className="h-7 w-7 text-red-500 dark:text-red-400"
                         onClick={() => handleDelete(p.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -151,7 +151,7 @@ export default function ProtocolsPage() {
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {p.description && (
-                    <p className="text-xs text-gray-500 line-clamp-2">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
                       {p.description}
                     </p>
                   )}

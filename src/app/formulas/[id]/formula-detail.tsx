@@ -59,7 +59,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
           </Button>
         </Link>
-        <p className="text-gray-500">Formula not found.</p>
+        <p className="text-gray-500 dark:text-gray-400">Formula not found.</p>
       </div>
     );
   }
@@ -157,8 +157,8 @@ export default function FormulaDetailClient({ id }: { id: string }) {
             </Button>
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">{local.name}</h1>
-            <p className="text-xs text-gray-500">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{local.name}</h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               v{local.version} · {sim.toFixed(0)}% match
             </p>
           </div>
@@ -197,14 +197,14 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                 </CardHeader>
                 <CardContent>
                   {local.ingredientLines.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-6">
+                    <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">
                       No ingredients added yet.
                     </p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b text-left text-gray-500">
+                          <tr className="border-b text-left text-gray-500 dark:text-gray-400">
                             <th className="pb-2 font-medium">Ingredient</th>
                             <th className="pb-2 font-medium w-28">Mass (g)</th>
                             <th className="pb-2 font-medium w-16">Lock</th>
@@ -277,7 +277,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 text-red-500"
+                                    className="h-7 w-7 text-red-500 dark:text-red-400"
                                     onClick={() => removeLine(idx)}
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
@@ -302,22 +302,22 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Total Input</span>
+                    <span className="text-gray-500 dark:text-gray-400">Total Input</span>
                     <span className="font-medium">
                       {mb.totalInputG.toFixed(1)} g
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Target Output</span>
+                    <span className="text-gray-500 dark:text-gray-400">Target Output</span>
                     <span className="font-medium">
                       {mb.totalOutputG.toFixed(1)} g
                     </span>
                   </div>
                   <div className="flex justify-between border-t pt-2">
-                    <span className="text-gray-500">Loss / Gain</span>
+                    <span className="text-gray-500 dark:text-gray-400">Loss / Gain</span>
                     <span
                       className={`font-medium ${
-                        mb.lossG > 0 ? "text-red-600" : "text-green-600"
+                        mb.lossG > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
                       }`}
                     >
                       {mb.lossG > 0 ? "+" : ""}
@@ -325,11 +325,11 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Water Adjustment</span>
+                    <span className="text-gray-500 dark:text-gray-400">Water Adjustment</span>
                     <span>{mb.waterAdjustmentG.toFixed(1)} g</span>
                   </div>
                   <div className="flex justify-between border-t pt-2">
-                    <span className="text-gray-500">Estimated Cost</span>
+                    <span className="text-gray-500 dark:text-gray-400">Estimated Cost</span>
                     <span className="font-medium">
                       ${local.ingredientLines
                         .reduce((sum, line) => {
@@ -384,10 +384,10 @@ export default function FormulaDetailClient({ id }: { id: string }) {
               <Card>
                 <CardContent className="pt-4">
                   <div className="text-center">
-                    <p className="text-3xl font-bold text-indigo-600">
+                    <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
                       {sim.toFixed(0)}%
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
                       Composition Match
                     </p>
                   </div>
@@ -429,7 +429,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <p className="text-sm text-gray-400 text-center py-8">
+                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
                   Add ingredients to see contributions.
                 </p>
               )}
@@ -466,7 +466,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
               <CardTitle className="text-base">Sensitivity Analysis</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 See what happens if you change one ingredient&apos;s mass.
               </p>
               <div className="flex gap-4 items-end">
@@ -510,7 +510,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b text-left text-gray-500">
+                      <tr className="border-b text-left text-gray-500 dark:text-gray-400">
                         <th className="pb-2 font-medium">Component</th>
                         <th className="pb-2 font-medium">Original (g)</th>
                         <th className="pb-2 font-medium">Modified (g)</th>
@@ -539,9 +539,9 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                             <td
                               className={`py-1.5 font-medium ${
                                 delta > 0
-                                  ? "text-green-600"
+                                  ? "text-green-600 dark:text-green-400"
                                   : delta < 0
-                                  ? "text-red-600"
+                                  ? "text-red-600 dark:text-red-400"
                                   : ""
                               }`}
                             >

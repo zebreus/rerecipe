@@ -54,7 +54,7 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
           </Button>
         </Link>
-        <p className="text-gray-500">Protocol not found.</p>
+        <p className="text-gray-500 dark:text-gray-400">Protocol not found.</p>
       </div>
     );
   }
@@ -128,7 +128,7 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
             </Button>
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">{local.name}</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{local.name}</h1>
             <div className="flex gap-2 mt-0.5">
               <Badge variant="outline">{local.category}</Badge>
               <Badge variant="secondary">v{local.version}</Badge>
@@ -156,7 +156,7 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
               value={scaleFactor}
               onChange={(e) => setScaleFactor(Number(e.target.value) || 1)}
             />
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-gray-500 dark:text-gray-400">
               {scaleFactor === 1 ? "Original scale" : `${scaleFactor}× original`}
             </span>
             {scaleFactor !== 1 && (
@@ -262,17 +262,17 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
         </CardHeader>
         <CardContent className="space-y-3">
           {local.steps.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">
+            <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">
               No steps yet. Add your first process step.
             </p>
           ) : (
             local.steps.map((step, idx) => (
               <div
                 key={step.id}
-                className="border rounded-lg p-4 space-y-3 bg-gray-50"
+                className="border rounded-lg p-4 space-y-3 bg-gray-50 dark:bg-gray-900"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-gray-400 w-6">
+                  <span className="text-xs font-bold text-gray-400 dark:text-gray-500 w-6">
                     #{step.order}
                   </span>
                   <Input
@@ -305,7 +305,7 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-red-500"
+                      className="h-7 w-7 text-red-500 dark:text-red-400"
                       onClick={() => removeStep(idx)}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
