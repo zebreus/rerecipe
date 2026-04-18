@@ -60,6 +60,7 @@ interface StoreContextValue {
   deleteIngredient: (id: string) => void;
   // Formulas
   addFormula: (f: Formula) => void;
+  addFormulas: (formulas: Formula[]) => void;
   updateFormula: (f: Formula) => void;
   deleteFormula: (id: string) => void;
   recalcFormula: (id: string) => void;
@@ -142,6 +143,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (f: Formula) => {
       const recalc = recalcFormulaObj(f, data.ingredients);
       persist({ ...data, formulas: [...data.formulas, recalc] });
+    },
+    [data, persist]
+  );
+  const addFormulas = useCallback(
+    (formulas: Formula[]) => {
+      const recalced = formulas.map((f) => recalcFormulaObj(f, data.ingredients));
+      persist({ ...data, formulas: [...data.formulas, ...recalced] });
     },
     [data, persist]
   );
@@ -308,6 +316,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         updateIngredient,
         deleteIngredient,
         addFormula,
+        addFormulas,
         updateFormula,
         deleteFormula,
         recalcFormula,

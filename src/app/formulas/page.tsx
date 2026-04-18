@@ -53,7 +53,7 @@ import {
 } from "recharts";
 
 export default function FormulasPage() {
-  const { data, addFormula, deleteFormula } = useStore();
+  const { data, addFormula, addFormulas, deleteFormula } = useStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
@@ -160,7 +160,7 @@ export default function FormulasPage() {
       { suffix: "-10%", factor: 0.9 },
       { suffix: "random ±10%", factor: 0 },
     ];
-    for (const v of variations) {
+    const newFormulas: Formula[] = variations.map((v) => {
       const lines = f.ingredientLines.map((line) => ({
         ...line,
         massG: Math.round(
@@ -171,7 +171,7 @@ export default function FormulasPage() {
             100
         ) / 100,
       }));
-      const dup: Formula = {
+      return {
         ...f,
         id: generateId(),
         name: `${f.name} (${v.suffix})`,
@@ -182,8 +182,8 @@ export default function FormulasPage() {
         createdAt: now,
         updatedAt: now,
       };
-      addFormula(dup);
-    }
+    });
+    addFormulas(newFormulas);
   }
 
   // Comparison chart data

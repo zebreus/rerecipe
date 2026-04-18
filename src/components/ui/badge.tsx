@@ -9,10 +9,10 @@ function Badge({
   variant?: "default" | "secondary" | "destructive" | "outline";
 }) {
   const variants: Record<string, string> = {
-    default: "border-transparent bg-gray-900 text-gray-50 shadow",
-    secondary: "border-transparent bg-gray-100 text-gray-900",
+    default: "border-transparent bg-gray-900 dark:bg-gray-100 text-gray-50 dark:text-gray-900 shadow",
+    secondary: "border-transparent bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100",
     destructive: "border-transparent bg-red-500 text-gray-50 shadow",
-    outline: "text-gray-950 border-gray-200",
+    outline: "text-gray-950 dark:text-gray-100 border-gray-200 dark:border-gray-700",
   };
   return (
     <div
