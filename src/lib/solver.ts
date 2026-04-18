@@ -341,6 +341,28 @@ export function rankTrials(
     .sort((a, b) => b.combinedScore - a.combinedScore);
 }
 
+// ─── Compliance Checker ───
+export function checkCompliance(
+  formulaComposition: ComponentComposition,
+  targetComposition: ComponentComposition
+): { status: "compliant" | "warning" | "non-compliant"; maxDeviation: number; deviations: { key: string; label: string; diff: number }[] } {
+  const labels: Record<string, string> = {
+    water_pct: "Water", fat_pct: "Fat", protein_pct: "Protein", sugar_pct: "Sugar",
+    starch_pct: "Starch", salt_pct: "Salt", hydrocolloid_pct: "Hydrocolloid", other_pct: "Other",
+  };
+  const deviations: { key: string; label: string; diff: number }[] = [];
+  let maxDeviation = 0;
+  for (const key of COMPONENT_KEYS) {
+    const diff = Math.abs(formulaComposition[key] - targetComposition[key]);
+    if (diff > 2) {
+      deviations.push({ key, label: labels[key] || key, diff: round2(diff) });
+    }
+    if (diff > maxDeviation) maxDeviation = diff;
+  }
+  const status = maxDeviation <= 2 ? "compliant" : maxDeviation <= 5 ? "warning" : "non-compliant";
+  return { status, maxDeviation: round2(maxDeviation), deviations };
+}
+
 // ─── Helpers ───
 function round2(n: number): number {
   return Math.round(n * 100) / 100;

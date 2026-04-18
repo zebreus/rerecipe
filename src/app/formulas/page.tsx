@@ -23,6 +23,7 @@ import {
   FlaskConical,
   Sparkles,
   Copy,
+  GitBranch,
 } from "lucide-react";
 import { generateId } from "@/lib/utils";
 import type { Formula } from "@/lib/types";
@@ -32,6 +33,7 @@ import {
   componentsToPercent,
   compositionSimilarity,
   solveFormula,
+  checkCompliance,
 } from "@/lib/solver";
 import {
   COMPONENT_KEYS,
@@ -145,6 +147,43 @@ export default function FormulasPage() {
     addFormula(dup);
   }
 
+  function handleCreateVariations(f: Formula) {
+    if (f.ingredientLines.length === 0) {
+      alert("Formula has no ingredients to vary.");
+      return;
+    }
+    const now = new Date().toISOString();
+    const variations = [
+      { suffix: "+10%", factor: 1.1 },
+      { suffix: "-10%", factor: 0.9 },
+      { suffix: "random ±10%", factor: 0 },
+    ];
+    for (const v of variations) {
+      const lines = f.ingredientLines.map((line) => ({
+        ...line,
+        massG: Math.round(
+          line.massG *
+            (v.factor === 0
+              ? 1 + (Math.random() * 0.2 - 0.1) // ±10% random
+              : v.factor) *
+            100
+        ) / 100,
+      }));
+      const dup: Formula = {
+        ...f,
+        id: generateId(),
+        name: `${f.name} (${v.suffix})`,
+        version: 1,
+        ingredientLines: lines,
+        calculatedComponents: calculateFormulaComponents(lines, data.ingredients),
+        massBalance: calculateMassBalance(lines, f.targetMassG),
+        createdAt: now,
+        updatedAt: now,
+      };
+      addFormula(dup);
+    }
+  }
+
   // Comparison chart data
   const comparisonData =
     data.formulas.length > 0
@@ -223,6 +262,10 @@ export default function FormulasPage() {
               pct,
               data.targetProduct.targetComposition
             );
+            const compliance = checkCompliance(
+              pct,
+              data.targetProduct.targetComposition
+            );
 
             return (
               <Card key={f.id} className="hover:border-gray-300 transition-colors">
@@ -234,6 +277,15 @@ export default function FormulasPage() {
                       </CardTitle>
                     </Link>
                     <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-gray-500"
+                        onClick={() => handleCreateVariations(f)}
+                        title="Create Variations"
+                      >
+                        <GitBranch className="h-3.5 w-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -270,6 +322,22 @@ export default function FormulasPage() {
                       variant={sim > 80 ? "default" : "outline"}
                     >
                       {sim.toFixed(0)}% match
+                    </Badge>
+                    <Badge
+                      variant={compliance.status === "compliant" ? "default" : "outline"}
+                      className={
+                        compliance.status === "compliant"
+                          ? "bg-green-100 text-green-800 border-green-300"
+                          : compliance.status === "warning"
+                          ? "bg-yellow-100 text-yellow-800 border-yellow-300"
+                          : "bg-red-100 text-red-800 border-red-300"
+                      }
+                    >
+                      {compliance.status === "compliant"
+                        ? "✓ Compliant"
+                        : compliance.status === "warning"
+                        ? "⚠ Warning"
+                        : "✗ Non-compliant"}
                     </Badge>
                   </div>
                   <div className="flex gap-2 text-xs text-gray-500">

@@ -44,6 +44,7 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
     protocol ? structuredClone(protocol) : null
   );
   const [dirty, setDirty] = useState(false);
+  const [scaleFactor, setScaleFactor] = useState(1);
 
   if (!local) {
     return (
@@ -113,7 +114,7 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
     .filter((s) => s.durationMin != null)
     .map((s) => ({
       name: s.name || `Step ${s.order}`,
-      duration: s.durationMin || 0,
+      duration: Math.round((s.durationMin || 0) * scaleFactor * 10) / 10,
       temp: s.temperatureC || 0,
     }));
 
@@ -141,6 +142,31 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
           <Save className="h-4 w-4 mr-1" /> Save
         </Button>
       </div>
+
+      {/* Scale-Up Calculator */}
+      <Card>
+        <CardContent className="pt-4">
+          <div className="flex items-center gap-3">
+            <Label className="text-sm font-medium whitespace-nowrap">Scale Factor:</Label>
+            <Input
+              type="number"
+              step="0.5"
+              min="0.1"
+              className="w-24 h-8"
+              value={scaleFactor}
+              onChange={(e) => setScaleFactor(Number(e.target.value) || 1)}
+            />
+            <span className="text-xs text-gray-500">
+              {scaleFactor === 1 ? "Original scale" : `${scaleFactor}× original`}
+            </span>
+            {scaleFactor !== 1 && (
+              <Button variant="ghost" size="sm" className="text-xs" onClick={() => setScaleFactor(1)}>
+                Reset
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Protocol Info */}
       <Card>

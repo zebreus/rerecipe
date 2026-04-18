@@ -9,6 +9,8 @@ import {
   componentsToPercent,
   calculateSimilarityScore,
   rankTrials,
+  compositionSimilarity,
+  checkCompliance,
 } from "@/lib/solver";
 import {
   COMPONENT_KEYS,
@@ -31,7 +33,7 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { Trophy, TrendingUp, BarChart3 } from "lucide-react";
+import { Trophy, TrendingUp, BarChart3, Table } from "lucide-react";
 
 export default function AnalysisPage() {
   const { data } = useStore();
@@ -197,6 +199,8 @@ export default function AnalysisPage() {
         <TabsList>
           <TabsTrigger value="ranking">Ranking</TabsTrigger>
           <TabsTrigger value="formulas">Formula Comparison</TabsTrigger>
+          <TabsTrigger value="sidebyside">Side-by-Side</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance</TabsTrigger>
           <TabsTrigger value="progression">Trial Progression</TabsTrigger>
           <TabsTrigger value="radar">Score Radar</TabsTrigger>
           <TabsTrigger value="reasoning">Evidence & Reasoning</TabsTrigger>
@@ -306,6 +310,142 @@ export default function AnalysisPage() {
                 <p className="text-sm text-gray-400 text-center py-8">
                   No formulas to compare.
                 </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Side-by-side formula comparison table */}
+        <TabsContent value="sidebyside">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Table className="h-4 w-4 text-indigo-500" />
+                Side-by-Side Composition Table
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {formulas.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8">
+                  No formulas to compare.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-gray-500">
+                        <th className="pb-2 font-medium">Component</th>
+                        <th className="pb-2 font-medium">Target</th>
+                        {formulas.map((f) => (
+                          <th key={f.id} className="pb-2 font-medium">{f.name}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {COMPONENT_KEYS.map((key) => (
+                        <tr key={key} className="border-b last:border-0">
+                          <td className="py-1.5 font-medium">{COMPONENT_LABELS[key]}</td>
+                          <td className="py-1.5">{targetProduct.targetComposition[key].toFixed(1)}%</td>
+                          {formulas.map((f) => {
+                            const pct = componentsToPercent(
+                              calculateFormulaComponents(f.ingredientLines, ingredients)
+                            );
+                            const diff = pct[key] - targetProduct.targetComposition[key];
+                            return (
+                              <td
+                                key={f.id}
+                                className={`py-1.5 ${
+                                  Math.abs(diff) > 5
+                                    ? "text-red-600 font-medium"
+                                    : Math.abs(diff) > 2
+                                    ? "text-yellow-600"
+                                    : "text-green-600"
+                                }`}
+                              >
+                                {pct[key].toFixed(1)}%
+                                <span className="text-xs ml-1">
+                                  ({diff > 0 ? "+" : ""}{diff.toFixed(1)})
+                                </span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                      <tr className="border-t-2 font-medium">
+                        <td className="py-1.5">Match Score</td>
+                        <td className="py-1.5">—</td>
+                        {formulas.map((f) => {
+                          const pct = componentsToPercent(
+                            calculateFormulaComponents(f.ingredientLines, ingredients)
+                          );
+                          const sim = compositionSimilarity(pct, targetProduct.targetComposition);
+                          return (
+                            <td key={f.id} className="py-1.5">{sim.toFixed(1)}%</td>
+                          );
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Compliance tab */}
+        <TabsContent value="compliance">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Label Compliance Check</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {formulas.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8">
+                  No formulas to check.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {formulas.map((f) => {
+                    const pct = componentsToPercent(
+                      calculateFormulaComponents(f.ingredientLines, ingredients)
+                    );
+                    const compliance = checkCompliance(pct, targetProduct.targetComposition);
+                    return (
+                      <div key={f.id} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium">{f.name}</span>
+                          <span
+                            className={`text-xs px-2 py-1 rounded-full font-medium ${
+                              compliance.status === "compliant"
+                                ? "bg-green-100 text-green-800"
+                                : compliance.status === "warning"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {compliance.status === "compliant"
+                              ? "✓ Compliant"
+                              : compliance.status === "warning"
+                              ? "⚠ Warning"
+                              : "✗ Non-compliant"}
+                            {" (max deviation: "}
+                            {compliance.maxDeviation.toFixed(1)}%)
+                          </span>
+                        </div>
+                        {compliance.deviations.length > 0 && (
+                          <ul className="text-xs text-gray-600 space-y-1">
+                            {compliance.deviations.map((d) => (
+                              <li key={d.key} className="flex gap-2">
+                                <span className={d.diff > 5 ? "text-red-500" : "text-yellow-500"}>●</span>
+                                {d.label}: {d.diff.toFixed(1)}% deviation from target
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </CardContent>
           </Card>
