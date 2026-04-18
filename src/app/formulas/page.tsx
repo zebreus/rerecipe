@@ -22,6 +22,7 @@ import {
   Trash2,
   FlaskConical,
   Sparkles,
+  Copy,
 } from "lucide-react";
 import { generateId } from "@/lib/utils";
 import type { Formula } from "@/lib/types";
@@ -131,6 +132,19 @@ export default function FormulasPage() {
     }
   }
 
+  function handleDuplicate(f: Formula) {
+    const now = new Date().toISOString();
+    const dup: Formula = {
+      ...f,
+      id: generateId(),
+      name: `${f.name} (copy)`,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    addFormula(dup);
+  }
+
   // Comparison chart data
   const comparisonData =
     data.formulas.length > 0
@@ -219,14 +233,25 @@ export default function FormulasPage() {
                         {f.name}
                       </CardTitle>
                     </Link>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-red-500"
-                      onClick={() => handleDelete(f.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-gray-500"
+                        onClick={() => handleDuplicate(f)}
+                        title="Duplicate"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-500"
+                        onClick={() => handleDelete(f.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">

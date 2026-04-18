@@ -68,7 +68,8 @@ export default function FormulaDetailClient({ id }: { id: string }) {
 
   function save() {
     if (!local) return;
-    updateFormula(local);
+    updateFormula({ ...local, version: local.version + 1 });
+    setLocal({ ...local, version: local.version + 1 });
     setDirty(false);
   }
 

@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
-import { Plus, Trash2, TestTube } from "lucide-react";
+import { Plus, Trash2, TestTube, Copy } from "lucide-react";
 import { generateId, statusColor, formatDate } from "@/lib/utils";
 import type { Trial } from "@/lib/types";
 import { calculateSimilarityScore } from "@/lib/solver";
@@ -69,6 +69,25 @@ export default function TrialsPage() {
     if (confirm("Delete this trial?")) {
       deleteTrial(id);
     }
+  }
+
+  function handleDuplicate(trial: Trial) {
+    const now = new Date().toISOString();
+    const runNumber =
+      data.trials.filter((t) => t.formulaId === trial.formulaId).length + 1;
+    const dup: Trial = {
+      ...trial,
+      id: generateId(),
+      runNumber,
+      status: "planned",
+      scores: trial.scores.map((s) => ({ ...s, score: 0 })),
+      similarityScore: 0,
+      startedAt: "",
+      completedAt: "",
+      createdAt: now,
+      updatedAt: now,
+    };
+    addTrial(dup);
   }
 
   const sortedTrials = [...data.trials].sort(
@@ -147,6 +166,15 @@ export default function TrialsPage() {
                         </p>
                         <p className="text-[10px] text-gray-400">Score</p>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-gray-500"
+                        onClick={() => handleDuplicate(trial)}
+                        title="Duplicate"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
