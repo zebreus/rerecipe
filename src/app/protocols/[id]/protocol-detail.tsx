@@ -1,0 +1,439 @@
+"use client";
+
+import { useState } from "react";
+import { useStore } from "@/lib/store";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  Save,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
+import type { Protocol, ProtocolStep } from "@/lib/types";
+import { generateId } from "@/lib/utils";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
+export default function ProtocolDetailClient({ id }: { id: string }) {
+  const { data, updateProtocol } = useStore();
+
+  const protocol = data.protocols.find((p) => p.id === id);
+  const [local, setLocal] = useState<Protocol | null>(
+    protocol ? structuredClone(protocol) : null
+  );
+  const [dirty, setDirty] = useState(false);
+
+  if (!local) {
+    return (
+      <div className="space-y-4">
+        <Link href="/protocols">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-1" /> Back
+          </Button>
+        </Link>
+        <p className="text-gray-500">Protocol not found.</p>
+      </div>
+    );
+  }
+
+  function save() {
+    if (!local) return;
+    updateProtocol(local);
+    setDirty(false);
+  }
+
+  function update(partial: Partial<Protocol>) {
+    if (!local) return;
+    setLocal({ ...local, ...partial, updatedAt: new Date().toISOString() });
+    setDirty(true);
+  }
+
+  function addStep() {
+    const newStep: ProtocolStep = {
+      id: generateId(),
+      order: local!.steps.length + 1,
+      name: "",
+      description: "",
+      temperatureC: null,
+      durationMin: null,
+      agitationLevel: "none",
+      additionIngredients: [],
+      holdConditions: "",
+      expectedEffects: [],
+    };
+    update({ steps: [...local!.steps, newStep] });
+  }
+
+  function updateStep(index: number, partial: Partial<ProtocolStep>) {
+    const steps = local!.steps.map((s, i) =>
+      i === index ? { ...s, ...partial } : s
+    );
+    update({ steps });
+  }
+
+  function removeStep(index: number) {
+    const steps = local!.steps
+      .filter((_, i) => i !== index)
+      .map((s, i) => ({ ...s, order: i + 1 }));
+    update({ steps });
+  }
+
+  function moveStep(index: number, direction: "up" | "down") {
+    const steps = [...local!.steps];
+    const target = direction === "up" ? index - 1 : index + 1;
+    if (target < 0 || target >= steps.length) return;
+    [steps[index], steps[target]] = [steps[target], steps[index]];
+    update({ steps: steps.map((s, i) => ({ ...s, order: i + 1 })) });
+  }
+
+  // Timeline chart data
+  const timelineData = local.steps
+    .filter((s) => s.durationMin != null)
+    .map((s) => ({
+      name: s.name || `Step ${s.order}`,
+      duration: s.durationMin || 0,
+      temp: s.temperatureC || 0,
+    }));
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link href="/protocols">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">{local.name}</h1>
+            <div className="flex gap-2 mt-0.5">
+              <Badge variant="outline">{local.category}</Badge>
+              <Badge variant="secondary">v{local.version}</Badge>
+              <Badge variant="secondary">
+                {local.steps.length} step{local.steps.length !== 1 ? "s" : ""}
+              </Badge>
+            </div>
+          </div>
+        </div>
+        <Button onClick={save} disabled={!dirty}>
+          <Save className="h-4 w-4 mr-1" /> Save
+        </Button>
+      </div>
+
+      {/* Protocol Info */}
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input
+                value={local.name}
+                onChange={(e) => update({ name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input
+                value={local.description}
+                onChange={(e) => update({ description: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Notes</Label>
+            <Textarea
+              value={local.notes}
+              onChange={(e) => update({ notes: e.target.value })}
+              rows={2}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Timeline visualization */}
+      {timelineData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Process Timeline
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={timelineData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" tick={{ fontSize: 9 }} />
+                <YAxis
+                  yAxisId="dur"
+                  orientation="left"
+                  tick={{ fontSize: 10 }}
+                  label={{
+                    value: "min",
+                    angle: -90,
+                    position: "insideLeft",
+                    style: { fontSize: 10 },
+                  }}
+                />
+                <YAxis
+                  yAxisId="temp"
+                  orientation="right"
+                  tick={{ fontSize: 10 }}
+                  label={{
+                    value: "°C",
+                    angle: 90,
+                    position: "insideRight",
+                    style: { fontSize: 10 },
+                  }}
+                />
+                <Tooltip />
+                <Bar
+                  yAxisId="dur"
+                  dataKey="duration"
+                  fill="#6366f1"
+                  name="Duration (min)"
+                />
+                <Bar
+                  yAxisId="temp"
+                  dataKey="temp"
+                  fill="#ef4444"
+                  name="Temp (°C)"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Steps editor */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base">Steps</CardTitle>
+          <Button size="sm" variant="outline" onClick={addStep}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add Step
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {local.steps.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">
+              No steps yet. Add your first process step.
+            </p>
+          ) : (
+            local.steps.map((step, idx) => (
+              <div
+                key={step.id}
+                className="border rounded-lg p-4 space-y-3 bg-gray-50"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-400 w-6">
+                    #{step.order}
+                  </span>
+                  <Input
+                    placeholder="Step name"
+                    className="flex-1 h-8 font-medium"
+                    value={step.name}
+                    onChange={(e) =>
+                      updateStep(idx, { name: e.target.value })
+                    }
+                  />
+                  <div className="flex gap-0.5">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      disabled={idx === 0}
+                      onClick={() => moveStep(idx, "up")}
+                    >
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      disabled={idx === local.steps.length - 1}
+                      onClick={() => moveStep(idx, "down")}
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-red-500"
+                      onClick={() => removeStep(idx)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Temp (°C)</Label>
+                    <Input
+                      type="number"
+                      className="h-8"
+                      value={step.temperatureC ?? ""}
+                      onChange={(e) =>
+                        updateStep(idx, {
+                          temperatureC: e.target.value
+                            ? Number(e.target.value)
+                            : null,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Duration (min)</Label>
+                    <Input
+                      type="number"
+                      className="h-8"
+                      value={step.durationMin ?? ""}
+                      onChange={(e) =>
+                        updateStep(idx, {
+                          durationMin: e.target.value
+                            ? Number(e.target.value)
+                            : null,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Agitation</Label>
+                    <Select
+                      value={step.agitationLevel}
+                      onValueChange={(v) =>
+                        updateStep(idx, {
+                          agitationLevel: v as ProtocolStep["agitationLevel"],
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Addition</Label>
+                    <Select
+                      value={
+                        step.additionIngredients.length > 0
+                          ? step.additionIngredients[0]
+                          : "__none__"
+                      }
+                      onValueChange={(v) =>
+                        updateStep(idx, {
+                          additionIngredients:
+                            v === "__none__" ? [] : [v],
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {data.ingredients.map((ing) => (
+                          <SelectItem key={ing.id} value={ing.id}>
+                            {ing.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Description</Label>
+                  <Textarea
+                    className="min-h-[40px]"
+                    value={step.description}
+                    onChange={(e) =>
+                      updateStep(idx, { description: e.target.value })
+                    }
+                    rows={1}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Hold Conditions</Label>
+                  <Input
+                    className="h-8"
+                    value={step.holdConditions}
+                    onChange={(e) =>
+                      updateStep(idx, {
+                        holdConditions: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Risk flags */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Expected Effects & Risk Flags</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <Label className="text-xs">Expected Effects (comma-separated)</Label>
+            <Input
+              value={local.expectedEffects.join(", ")}
+              onChange={(e) =>
+                update({
+                  expectedEffects: e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                })
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs">Risk Flags (comma-separated)</Label>
+            <Input
+              value={local.riskFlags.join(", ")}
+              onChange={(e) =>
+                update({
+                  riskFlags: e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
