@@ -53,6 +53,7 @@ export interface Ingredient {
   composition: ComponentComposition;
   source: string;
   confidence: number; // 0–1
+  costPerKg: number;
   substitutions: string[];
   constraints: string[];
   notes: string;

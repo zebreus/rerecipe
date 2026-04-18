@@ -12,6 +12,7 @@ import {
   BarChart3,
   Paperclip,
   Settings,
+  HelpCircle,
   Moon,
   Sun,
 } from "lucide-react";
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { href: "/analysis", label: "Analysis", icon: BarChart3 },
   { href: "/attachments", label: "Notes & Files", icon: Paperclip },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/help", label: "Help & Guide", icon: HelpCircle },
 ];
 
 export function Sidebar({

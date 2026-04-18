@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Save, Lock, Unlock } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Lock, Unlock, Printer } from "lucide-react";
 import type { Formula, FormulaLine } from "@/lib/types";
 import {
   COMPONENT_KEYS,
@@ -163,9 +163,17 @@ export default function FormulaDetailClient({ id }: { id: string }) {
             </p>
           </div>
         </div>
-        <Button onClick={save} disabled={!dirty}>
-          <Save className="h-4 w-4 mr-1" /> Save
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => window.print()}
+          >
+            <Printer className="h-4 w-4 mr-1" /> Print
+          </Button>
+          <Button onClick={save} disabled={!dirty}>
+            <Save className="h-4 w-4 mr-1" /> Save
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="builder">
@@ -319,6 +327,22 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                   <div className="flex justify-between">
                     <span className="text-gray-500">Water Adjustment</span>
                     <span>{mb.waterAdjustmentG.toFixed(1)} g</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-gray-500">Estimated Cost</span>
+                    <span className="font-medium">
+                      ${local.ingredientLines
+                        .reduce((sum, line) => {
+                          const ing = ingredients.find(
+                            (i) => i.id === line.ingredientId
+                          );
+                          return (
+                            sum +
+                            (ing?.costPerKg ?? 0) * (line.massG / 1000)
+                          );
+                        }, 0)
+                        .toFixed(2)}
+                    </span>
                   </div>
                 </CardContent>
               </Card>

@@ -202,12 +202,25 @@ export default function TargetPage() {
                     className={
                       Math.abs(totalPct - 100) < 0.5
                         ? "text-green-600 font-medium"
+                        : Math.abs(totalPct - 100) < 2
+                        ? "text-yellow-600 font-medium"
                         : "text-red-600 font-medium"
                     }
                   >
                     {totalPct.toFixed(1)}%
+                    {Math.abs(totalPct - 100) < 0.5
+                      ? " ✓"
+                      : Math.abs(totalPct - 100) < 2
+                      ? " ≈"
+                      : " ✗"}
                   </span>
                 </div>
+                {Math.abs(totalPct - 100) >= 2 && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Composition should sum to ~100%. Currently off by{" "}
+                    {Math.abs(totalPct - 100).toFixed(1)}%.
+                  </p>
+                )}
               </CardContent>
             </Card>
 

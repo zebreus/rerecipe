@@ -75,6 +75,7 @@ export default function IngredientsPage() {
       composition: { ...EMPTY_COMPOSITION },
       source: "",
       confidence: 0.9,
+      costPerKg: 0,
       substitutions: [],
       constraints: [],
       notes: "",
@@ -177,6 +178,7 @@ export default function IngredientsPage() {
                         <th className="pb-2 font-medium">Name</th>
                         <th className="pb-2 font-medium">Category</th>
                         <th className="pb-2 font-medium">Density</th>
+                        <th className="pb-2 font-medium">Cost/kg</th>
                         <th className="pb-2 font-medium">Water %</th>
                         <th className="pb-2 font-medium">Fat %</th>
                         <th className="pb-2 font-medium">Protein %</th>
@@ -200,6 +202,9 @@ export default function IngredientsPage() {
                             </Badge>
                           </td>
                           <td className="py-2">{ing.density_g_ml}</td>
+                          <td className="py-2">
+                            {ing.costPerKg ? `$${ing.costPerKg.toFixed(2)}` : "—"}
+                          </td>
                           <td className="py-2">
                             {ing.composition.water_pct}
                           </td>
@@ -389,6 +394,21 @@ export default function IngredientsPage() {
                       setEditing({
                         ...editing,
                         density_g_ml: Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cost per kg ($)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editing.costPerKg}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        costPerKg: Number(e.target.value),
                       })
                     }
                   />

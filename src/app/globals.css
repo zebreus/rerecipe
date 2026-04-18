@@ -45,3 +45,21 @@ body {
 .animate-out {
   animation: fadeOut 150ms ease-in, zoomOut 150ms ease-in;
 }
+
+/* Print styles */
+@media print {
+  aside,
+  nav,
+  .lg\:hidden,
+  button {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}

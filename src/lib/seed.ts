@@ -100,7 +100,7 @@ export function createSeedData(): ProjectData {
       salt_pct: 0.1,
       hydrocolloid_pct: 0,
       other_pct: 1.3,
-    }),
+    }, 1.2),
     makeIngredient("ing-2", "Short Grain Rice", "Grain", 0.85, {
       water_pct: 12,
       fat_pct: 0.6,
@@ -110,7 +110,7 @@ export function createSeedData(): ProjectData {
       salt_pct: 0,
       hydrocolloid_pct: 0,
       other_pct: 2.6,
-    }),
+    }, 2.5),
     makeIngredient("ing-3", "Granulated Sugar", "Sugar & Sweetener", 1.55, {
       water_pct: 0.1,
       fat_pct: 0,
@@ -120,7 +120,7 @@ export function createSeedData(): ProjectData {
       salt_pct: 0,
       hydrocolloid_pct: 0,
       other_pct: 0,
-    }),
+    }, 0.9),
     makeIngredient("ing-4", "Heavy Cream", "Dairy", 0.99, {
       water_pct: 58,
       fat_pct: 36,
@@ -130,7 +130,7 @@ export function createSeedData(): ProjectData {
       salt_pct: 0.05,
       hydrocolloid_pct: 0,
       other_pct: 1.05,
-    }),
+    }, 6.5),
     makeIngredient("ing-5", "Modified Starch", "Starch", 0.6, {
       water_pct: 10,
       fat_pct: 0,
@@ -140,7 +140,7 @@ export function createSeedData(): ProjectData {
       salt_pct: 0,
       hydrocolloid_pct: 0,
       other_pct: 1.7,
-    }),
+    }, 4.0),
     makeIngredient("ing-6", "Carrageenan", "Hydrocolloid", 0.65, {
       water_pct: 10,
       fat_pct: 0,
@@ -150,7 +150,7 @@ export function createSeedData(): ProjectData {
       salt_pct: 0,
       hydrocolloid_pct: 85,
       other_pct: 5,
-    }),
+    }, 35.0),
     makeIngredient("ing-7", "Vanilla Extract", "Flavor", 0.88, {
       water_pct: 52,
       fat_pct: 0,
@@ -160,7 +160,7 @@ export function createSeedData(): ProjectData {
       salt_pct: 0,
       hydrocolloid_pct: 0,
       other_pct: 36,
-    }),
+    }, 120.0),
     makeIngredient("ing-8", "Salt", "Salt", 2.16, {
       water_pct: 0,
       fat_pct: 0,
@@ -170,7 +170,7 @@ export function createSeedData(): ProjectData {
       salt_pct: 100,
       hydrocolloid_pct: 0,
       other_pct: 0,
-    }),
+    }, 0.5),
   ];
 
   data.formulas = [
@@ -445,7 +445,8 @@ function makeIngredient(
   name: string,
   category: string,
   density: number,
-  composition: Ingredient["composition"]
+  composition: Ingredient["composition"],
+  costPerKg: number = 0
 ): Ingredient {
   return {
     id,
@@ -455,6 +456,7 @@ function makeIngredient(
     composition,
     source: "",
     confidence: 0.9,
+    costPerKg,
     substitutions: [],
     constraints: [],
     notes: "",

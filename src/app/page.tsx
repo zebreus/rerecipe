@@ -16,6 +16,7 @@ import {
   Trophy,
   TrendingUp,
   AlertTriangle,
+  HelpCircle,
 } from "lucide-react";
 import {
   calculateFormulaComponents,
@@ -273,6 +274,12 @@ export default function DashboardPage() {
               <Button variant="outline" className="w-full justify-start gap-2">
                 <BarChart3 className="h-4 w-4" />
                 View Analysis
+              </Button>
+            </Link>
+            <Link href="/help" className="block">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <HelpCircle className="h-4 w-4" />
+                Getting Started Guide
               </Button>
             </Link>
           </CardContent>

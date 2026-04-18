@@ -140,6 +140,18 @@ export default function AttachmentsPage() {
                       {note.content}
                     </p>
                   )}
+                  {note.linkedTo.length > 0 && (
+                    <div className="flex gap-1 mt-1.5 flex-wrap">
+                      {note.linkedTo.map((link, i) => (
+                        <span
+                          key={i}
+                          className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded"
+                        >
+                          {link.entityType}: {link.entityId}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -236,6 +248,83 @@ export default function AttachmentsPage() {
                   rows={8}
                   placeholder="Write your notes here..."
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Link to Entities</Label>
+                <div className="space-y-1">
+                  {editingNote.linkedTo.map((link, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      <select
+                        className="border rounded px-2 py-1 text-xs flex-1"
+                        value={link.entityType}
+                        onChange={(e) => {
+                          const updated = [...editingNote.linkedTo];
+                          updated[i] = { ...updated[i], entityType: e.target.value };
+                          setEditingNote({ ...editingNote, linkedTo: updated });
+                        }}
+                      >
+                        <option value="formula">Formula</option>
+                        <option value="protocol">Protocol</option>
+                        <option value="trial">Trial</option>
+                        <option value="ingredient">Ingredient</option>
+                      </select>
+                      <select
+                        className="border rounded px-2 py-1 text-xs flex-1"
+                        value={link.entityId}
+                        onChange={(e) => {
+                          const updated = [...editingNote.linkedTo];
+                          updated[i] = { ...updated[i], entityId: e.target.value };
+                          setEditingNote({ ...editingNote, linkedTo: updated });
+                        }}
+                      >
+                        <option value="">Select...</option>
+                        {link.entityType === "formula" &&
+                          data.formulas.map((f) => (
+                            <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                        {link.entityType === "protocol" &&
+                          data.protocols.map((p) => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        {link.entityType === "trial" &&
+                          data.trials.map((t) => (
+                            <option key={t.id} value={t.id}>Trial #{t.runNumber}</option>
+                          ))}
+                        {link.entityType === "ingredient" &&
+                          data.ingredients.map((ing) => (
+                            <option key={ing.id} value={ing.id}>{ing.name}</option>
+                          ))}
+                      </select>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-red-500 shrink-0"
+                        onClick={() => {
+                          const updated = editingNote.linkedTo.filter((_, j) => j !== i);
+                          setEditingNote({ ...editingNote, linkedTo: updated });
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() =>
+                      setEditingNote({
+                        ...editingNote,
+                        linkedTo: [
+                          ...editingNote.linkedTo,
+                          { entityType: "formula", entityId: "" },
+                        ],
+                      })
+                    }
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> Link Entity
+                  </Button>
+                </div>
               </div>
             </div>
           )}
