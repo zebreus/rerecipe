@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Recipe RE – Reverse Engineering Suite
+
+A web-based Next.js application for reverse-engineering recipes from finished products, then running and tracking experimental protocols.
+
+## Features
+
+### Core Capabilities
+- **Target Product Definition** – Define the product being reverse-engineered with composition targets and observed attributes
+- **Ingredient Intelligence Library** – Structured database of ingredients with full composition metadata (water, fat, protein, sugar, starch, salt, hydrocolloid fractions)
+- **Mass-Balance Formulation Solver** – Auto-generate candidate formulas from target composition using constraint-based solving
+- **Protocol Lab** – Design and compare manufacturing methods with step-by-step process definition
+- **Trial Tracking** – Lab notebook for every experiment with scoring, observations, and measurements
+- **Analysis & Ranking** – Compare trials by composition match, outcome scores, and combined ranking
+
+### Key Features
+- **Formula Builder** with ingredient lines, lock/unlock, mass balance calculation
+- **Contribution Heatmap** showing each ingredient's component breakdown
+- **Sensitivity Analysis** for "what-if" ingredient changes
+- **Score Radar Chart** for multi-dimensional trial evaluation
+- **Evidence & Reasoning** panel with system-generated improvement suggestions
+- **JSON Export/Import** for complete project portability
+
+## Tech Stack
+
+- **Next.js 16** (App Router)
+- **TypeScript**
+- **Tailwind CSS**
+- **Radix UI** (Tabs, Dialog, Select, Progress, Label, Slider, Tooltip, Accordion)
+- **Recharts** (Bar, Radar, Line charts)
+- **localStorage** persistence with JSON import/export
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+├── app/                    # Next.js App Router pages
+│   ├── page.tsx            # Dashboard
+│   ├── target/             # Target product setup
+│   ├── ingredients/        # Ingredient library
+│   ├── formulas/           # Candidate formulas
+│   │   └── [id]/           # Formula detail (builder, heatmap, sensitivity)
+│   ├── protocols/          # Protocol lab
+│   │   └── [id]/           # Protocol detail (step editor, timeline)
+│   ├── trials/             # Trial log
+│   │   └── [id]/           # Trial detail (scoring, observations)
+│   ├── analysis/           # Ranking, comparison, reasoning
+│   ├── attachments/        # Notes and file references
+│   └── settings/           # Project config, import/export
+├── components/
+│   ├── sidebar.tsx         # Navigation sidebar
+│   └── ui/                 # Reusable UI components
+└── lib/
+    ├── types.ts            # TypeScript interfaces and constants
+    ├── store.tsx           # React context store with localStorage
+    ├── solver.ts           # Formulation solver, mass balance, scoring
+    ├── seed.ts             # Example/demo seed data
+    └── utils.ts            # Utility functions
+```
 
-## Learn More
+## Data Model
 
-To learn more about Next.js, take a look at the following resources:
+The app uses a single JSON source of truth persisted in localStorage. Key entities:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Project** – Single workspace
+- **Target Product** – The product being reverse-engineered
+- **Ingredients** – Library with composition data
+- **Formulas** – Candidate formulations with ingredient lines
+- **Protocols** – Manufacturing methods with ordered steps
+- **Trials** – Experiment logs with scoring and observations
+- **Notes & Attachments** – Lab notebook entries
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Routes
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Route | Description |
+|-------|-------------|
+| `/` | Project dashboard |
+| `/target` | Target product setup |
+| `/ingredients` | Ingredient library |
+| `/formulas` | Candidate formulas |
+| `/formulas/[id]` | Formula detail |
+| `/protocols` | Protocol library |
+| `/protocols/[id]` | Protocol detail |
+| `/trials` | All trials |
+| `/trials/[id]` | Trial log |
+| `/analysis` | Scoring, comparisons, reasoning |
+| `/attachments` | Notes and files |
+| `/settings` | Project configuration |
