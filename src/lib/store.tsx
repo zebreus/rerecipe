@@ -16,6 +16,7 @@ import type {
   TargetProduct,
   Note,
   Attachment,
+  ScoringProfile,
 } from "./types";
 import { createSeedData } from "./seed";
 import {
@@ -77,6 +78,8 @@ interface StoreContextValue {
   // Attachments
   addAttachment: (a: Attachment) => void;
   deleteAttachment: (id: string) => void;
+  // Scoring Profiles
+  updateScoringProfiles: (profiles: ScoringProfile[]) => void;
   // Utilities
   exportJSON: () => string;
   importJSON: (json: string) => boolean;
@@ -260,6 +263,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [data, persist]
   );
 
+  // ─── Scoring Profiles ───
+  const updateScoringProfiles = useCallback(
+    (profiles: ScoringProfile[]) => {
+      persist({ ...data, scoringProfiles: profiles });
+    },
+    [data, persist]
+  );
+
   // ─── Import / Export ───
   const exportJSON = useCallback(() => JSON.stringify(data, null, 2), [data]);
   const importJSON = useCallback(
@@ -311,6 +322,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         deleteNote,
         addAttachment,
         deleteAttachment,
+        updateScoringProfiles,
         exportJSON,
         importJSON,
         resetToSeed,

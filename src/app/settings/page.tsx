@@ -12,15 +12,21 @@ import {
   Upload,
   RotateCcw,
   Save,
+  Plus,
+  Trash2,
 } from "lucide-react";
+import { generateId } from "@/lib/utils";
+import type { ScoringProfile } from "@/lib/types";
 
 export default function SettingsPage() {
-  const { data, updateProject, exportJSON, importJSON, resetToSeed } =
+  const { data, updateProject, exportJSON, importJSON, resetToSeed, updateScoringProfiles } =
     useStore();
   const [projectName, setProjectName] = useState(data.project.name);
   const [importText, setImportText] = useState("");
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [profiles, setProfiles] = useState<ScoringProfile[]>(data.scoringProfiles);
+  const [profilesDirty, setProfilesDirty] = useState(false);
 
   function handleSaveName() {
     updateProject(projectName);
@@ -174,6 +180,156 @@ export default function SettingsPage() {
               {importStatus}
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Scoring Profile Editor */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base">Scoring Profiles</CardTitle>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const newProfile: ScoringProfile = {
+                  id: generateId(),
+                  name: `Profile ${profiles.length + 1}`,
+                  dimensions: [{ name: "Quality", weight: 1 }],
+                };
+                setProfiles([...profiles, newProfile]);
+                setProfilesDirty(true);
+              }}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" /> Add Profile
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                updateScoringProfiles(profiles);
+                setProfilesDirty(false);
+              }}
+              disabled={!profilesDirty}
+            >
+              <Save className="h-3.5 w-3.5 mr-1" /> Save
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Define scoring dimensions and weights used when evaluating trials.
+          </p>
+          {profiles.map((profile, pIdx) => (
+            <div
+              key={profile.id}
+              className="border rounded-lg p-4 space-y-3 dark:border-gray-700"
+            >
+              <div className="flex items-center gap-3">
+                <Input
+                  value={profile.name}
+                  onChange={(e) => {
+                    const updated = [...profiles];
+                    updated[pIdx] = { ...profile, name: e.target.value };
+                    setProfiles(updated);
+                    setProfilesDirty(true);
+                  }}
+                  className="max-w-xs font-medium"
+                />
+                {profiles.length > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-red-500 dark:text-red-400"
+                    onClick={() => {
+                      setProfiles(profiles.filter((_, i) => i !== pIdx));
+                      setProfilesDirty(true);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                {profile.dimensions.map((dim, dIdx) => (
+                  <div key={dIdx} className="flex items-center gap-2">
+                    <Input
+                      value={dim.name}
+                      onChange={(e) => {
+                        const updated = [...profiles];
+                        const dims = [...profile.dimensions];
+                        dims[dIdx] = { ...dim, name: e.target.value };
+                        updated[pIdx] = { ...profile, dimensions: dims };
+                        setProfiles(updated);
+                        setProfilesDirty(true);
+                      }}
+                      className="flex-1"
+                      placeholder="Dimension name"
+                    />
+                    <div className="flex items-center gap-1">
+                      <Label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        Weight:
+                      </Label>
+                      <Input
+                        type="number"
+                        step="0.05"
+                        min="0"
+                        max="1"
+                        value={dim.weight}
+                        onChange={(e) => {
+                          const updated = [...profiles];
+                          const dims = [...profile.dimensions];
+                          dims[dIdx] = { ...dim, weight: Number(e.target.value) };
+                          updated[pIdx] = { ...profile, dimensions: dims };
+                          setProfiles(updated);
+                          setProfilesDirty(true);
+                        }}
+                        className="w-20"
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-red-500 dark:text-red-400 shrink-0"
+                      onClick={() => {
+                        const updated = [...profiles];
+                        const dims = profile.dimensions.filter((_, i) => i !== dIdx);
+                        updated[pIdx] = { ...profile, dimensions: dims };
+                        setProfiles(updated);
+                        setProfilesDirty(true);
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                onClick={() => {
+                  const updated = [...profiles];
+                  updated[pIdx] = {
+                    ...profile,
+                    dimensions: [
+                      ...profile.dimensions,
+                      { name: "", weight: 0.1 },
+                    ],
+                  };
+                  setProfiles(updated);
+                  setProfilesDirty(true);
+                }}
+              >
+                <Plus className="h-3 w-3 mr-1" /> Add Dimension
+              </Button>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                Total weight:{" "}
+                {profile.dimensions
+                  .reduce((sum, d) => sum + d.weight, 0)
+                  .toFixed(2)}
+              </p>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
