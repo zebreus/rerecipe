@@ -207,7 +207,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                           <tr className="border-b text-left text-gray-500 dark:text-gray-400">
                             <th className="pb-2 font-medium">Ingredient</th>
                             <th className="pb-2 font-medium w-28">Mass (g)</th>
-                            <th className="pb-2 font-medium w-24">Cost</th>
+                            <th className="pb-2 font-medium w-24">Cost ($)</th>
                             <th className="pb-2 font-medium w-16">Lock</th>
                             <th className="pb-2 font-medium w-12"></th>
                           </tr>
