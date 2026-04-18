@@ -32,7 +32,7 @@ import {
   EMPTY_COMPOSITION,
 } from "@/lib/types";
 import { generateId } from "@/lib/utils";
-import { Plus, Pencil, Trash2, Search, Leaf } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Leaf, Zap } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import {
@@ -46,6 +46,122 @@ import {
   Cell,
 } from "recharts";
 
+import type { ComponentComposition } from "@/lib/types";
+
+const COMMON_INGREDIENTS: {
+  name: string;
+  category: string;
+  density_g_ml: number;
+  composition: ComponentComposition;
+  costPerKg: number;
+}[] = [
+  {
+    name: "Water",
+    category: "Water",
+    density_g_ml: 1.0,
+    composition: { water_pct: 100, fat_pct: 0, protein_pct: 0, sugar_pct: 0, starch_pct: 0, salt_pct: 0, hydrocolloid_pct: 0, other_pct: 0 },
+    costPerKg: 0,
+  },
+  {
+    name: "Flour (All-Purpose)",
+    category: "Grain",
+    density_g_ml: 0.59,
+    composition: { water_pct: 11.9, fat_pct: 1.2, protein_pct: 10.3, sugar_pct: 0.3, starch_pct: 71.4, salt_pct: 0, hydrocolloid_pct: 0, other_pct: 4.9 },
+    costPerKg: 1.5,
+  },
+  {
+    name: "Butter",
+    category: "Fat & Oil",
+    density_g_ml: 0.91,
+    composition: { water_pct: 17.9, fat_pct: 81.1, protein_pct: 0.9, sugar_pct: 0.1, starch_pct: 0, salt_pct: 0, hydrocolloid_pct: 0, other_pct: 0 },
+    costPerKg: 8.0,
+  },
+  {
+    name: "Eggs (Whole)",
+    category: "Protein",
+    density_g_ml: 1.03,
+    composition: { water_pct: 76.1, fat_pct: 9.5, protein_pct: 12.6, sugar_pct: 0.7, starch_pct: 0, salt_pct: 0.4, hydrocolloid_pct: 0, other_pct: 0.7 },
+    costPerKg: 4.0,
+  },
+  {
+    name: "Olive Oil",
+    category: "Fat & Oil",
+    density_g_ml: 0.92,
+    composition: { water_pct: 0, fat_pct: 100, protein_pct: 0, sugar_pct: 0, starch_pct: 0, salt_pct: 0, hydrocolloid_pct: 0, other_pct: 0 },
+    costPerKg: 10.0,
+  },
+  {
+    name: "Whole Milk",
+    category: "Dairy",
+    density_g_ml: 1.03,
+    composition: { water_pct: 87.7, fat_pct: 3.3, protein_pct: 3.2, sugar_pct: 5.1, starch_pct: 0, salt_pct: 0.1, hydrocolloid_pct: 0, other_pct: 0.6 },
+    costPerKg: 1.2,
+  },
+  {
+    name: "Granulated Sugar",
+    category: "Sugar & Sweetener",
+    density_g_ml: 0.85,
+    composition: { water_pct: 0.1, fat_pct: 0, protein_pct: 0, sugar_pct: 99.9, starch_pct: 0, salt_pct: 0, hydrocolloid_pct: 0, other_pct: 0 },
+    costPerKg: 1.0,
+  },
+  {
+    name: "Salt",
+    category: "Salt",
+    density_g_ml: 1.2,
+    composition: { water_pct: 0.2, fat_pct: 0, protein_pct: 0, sugar_pct: 0, starch_pct: 0, salt_pct: 99.8, hydrocolloid_pct: 0, other_pct: 0 },
+    costPerKg: 0.5,
+  },
+  {
+    name: "Cocoa Powder",
+    category: "Flavor",
+    density_g_ml: 0.64,
+    composition: { water_pct: 3, fat_pct: 13.7, protein_pct: 19.6, sugar_pct: 1.8, starch_pct: 11, salt_pct: 0.1, hydrocolloid_pct: 0, other_pct: 50.8 },
+    costPerKg: 12.0,
+  },
+  {
+    name: "Cream Cheese",
+    category: "Dairy",
+    density_g_ml: 1.05,
+    composition: { water_pct: 54.4, fat_pct: 34.4, protein_pct: 5.9, sugar_pct: 3.2, starch_pct: 0, salt_pct: 0.6, hydrocolloid_pct: 0, other_pct: 1.5 },
+    costPerKg: 9.0,
+  },
+  {
+    name: "Honey",
+    category: "Sugar & Sweetener",
+    density_g_ml: 1.42,
+    composition: { water_pct: 17.1, fat_pct: 0, protein_pct: 0.3, sugar_pct: 82.1, starch_pct: 0, salt_pct: 0, hydrocolloid_pct: 0, other_pct: 0.5 },
+    costPerKg: 15.0,
+  },
+  {
+    name: "Cornstarch",
+    category: "Starch",
+    density_g_ml: 0.56,
+    composition: { water_pct: 8.3, fat_pct: 0.1, protein_pct: 0.3, sugar_pct: 0, starch_pct: 91, salt_pct: 0, hydrocolloid_pct: 0, other_pct: 0.3 },
+    costPerKg: 3.0,
+  },
+  {
+    name: "Baking Powder",
+    category: "Other",
+    density_g_ml: 0.9,
+    composition: { water_pct: 5, fat_pct: 0, protein_pct: 0, sugar_pct: 0, starch_pct: 28, salt_pct: 26, hydrocolloid_pct: 0, other_pct: 41 },
+    costPerKg: 6.0,
+  },
+  {
+    name: "Garlic",
+    category: "Flavor",
+    density_g_ml: 1.05,
+    composition: { water_pct: 58.6, fat_pct: 0.5, protein_pct: 6.4, sugar_pct: 1, starch_pct: 28.2, salt_pct: 0.1, hydrocolloid_pct: 0, other_pct: 5.2 },
+    costPerKg: 8.0,
+  },
+  {
+    name: "Onion",
+    category: "Flavor",
+    density_g_ml: 0.96,
+    composition: { water_pct: 89.1, fat_pct: 0.1, protein_pct: 1.1, sugar_pct: 4.2, starch_pct: 0, salt_pct: 0, hydrocolloid_pct: 0, other_pct: 5.5 },
+    costPerKg: 2.0,
+  },
+];
+
 export default function IngredientsPage() {
   const { data, addIngredient, updateIngredient, deleteIngredient } =
     useStore();
@@ -54,6 +170,7 @@ export default function IngredientsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Ingredient | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   const filtered = data.ingredients.filter((ing) => {
     const matchesSearch =
@@ -128,6 +245,10 @@ export default function IngredientsPage() {
         <Button onClick={openNew}>
           <Plus className="h-4 w-4 mr-1" />
           Add Ingredient
+        </Button>
+        <Button variant="outline" onClick={() => setQuickAddOpen(true)}>
+          <Zap className="h-4 w-4 mr-1" />
+          Quick Add
         </Button>
       </PageHeader>
 
@@ -495,6 +616,70 @@ export default function IngredientsPage() {
             </Button>
             <Button onClick={handleSave}>Save</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Add Dialog */}
+      <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Quick Add Common Ingredient</DialogTitle>
+            <DialogDescription>
+              Click an ingredient to add it to your library instantly.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto space-y-1">
+            {COMMON_INGREDIENTS.map((item) => {
+              const alreadyAdded = data.ingredients.some(
+                (ing) => ing.name.toLowerCase() === item.name.toLowerCase()
+              );
+              return (
+                <button
+                  key={item.name}
+                  disabled={alreadyAdded}
+                  className="w-full text-left px-3 py-2 rounded-md flex items-center justify-between gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent transition-colors"
+                  onClick={() => {
+                    const now = new Date().toISOString();
+                    addIngredient({
+                      id: generateId(),
+                      name: item.name,
+                      category: item.category,
+                      density_g_ml: item.density_g_ml,
+                      composition: { ...item.composition },
+                      source: "",
+                      confidence: 0.9,
+                      costPerKg: item.costPerKg,
+                      substitutions: [],
+                      constraints: [],
+                      notes: "",
+                      createdAt: now,
+                      updatedAt: now,
+                    });
+                  }}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-medium text-sm truncate">
+                      {item.name}
+                    </span>
+                    <Badge variant="outline" className="text-xs shrink-0">
+                      {item.category}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {alreadyAdded ? (
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        Already added
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        W{item.composition.water_pct}% F{item.composition.fat_pct}% P{item.composition.protein_pct}%
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
