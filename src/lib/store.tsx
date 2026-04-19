@@ -50,7 +50,9 @@ function saveData(data: ProjectData) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   } catch (e) {
     if (e instanceof DOMException && e.name === "QuotaExceededError") {
-      console.error("Storage quota exceeded. Please export your project data and clear old data from Settings.");
+      console.error("Storage quota exceeded. Please export your project data and use Settings → Reset to free space.");
+    } else {
+      console.error("Failed to save project data to localStorage:", e);
     }
   }
 }
