@@ -95,8 +95,9 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
 
   function save() {
     if (!local) return;
-    updateProtocol({ ...local, version: (local.version || 1) + 1 });
-    setLocal({ ...local, version: (local.version || 1) + 1 });
+    const newVersion = (local.version || 1) + 1;
+    updateProtocol({ ...local, version: newVersion });
+    setLocal({ ...local, version: newVersion });
     setDirty(false);
     setConfirmSaveOpen(false);
   }
