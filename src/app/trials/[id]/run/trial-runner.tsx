@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useStore } from "@/lib/store";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -108,13 +108,18 @@ export default function TrialRunnerClient({ id }: { id: string }) {
   const protocol = trial
     ? data.protocols.find((p) => p.id === trial.protocolId)
     : undefined;
-  const steps = protocol
-    ? [...protocol.steps].sort((a, b) => a.order - b.order)
-    : [];
+  const steps = useMemo(
+    () => protocol
+      ? [...protocol.steps].sort((a, b) => a.order - b.order)
+      : [],
+    [protocol]
+  );
 
   // ─── State ───
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [timerSecondsLeft, setTimerSecondsLeft] = useState<number | null>(null);
+  const [timerSecondsLeft, setTimerSecondsLeft] = useState<number | null>(
+    steps[0]?.durationMin ? steps[0].durationMin * 60 : null
+  );
   const [timerRunning, setTimerRunning] = useState(false);
   const [trialStartedAt, setTrialStartedAt] = useState<string | null>(
     trial?.startedAt || null
@@ -148,16 +153,18 @@ export default function TrialRunnerClient({ id }: { id: string }) {
     [trial, updateTrial]
   );
 
-  // ─── Initialize timer when step changes ───
-  useEffect(() => {
-    if (currentStep?.durationMin) {
-      setTimerSecondsLeft(currentStep.durationMin * 60);
-      setTimerRunning(false);
-    } else {
-      setTimerSecondsLeft(null);
+  const goToStep = useCallback((idx: number) => {
+    if (idx >= 0 && idx < steps.length) {
+      setCurrentStepIndex(idx);
+      const nextStep = steps[idx];
+      if (nextStep?.durationMin) {
+        setTimerSecondsLeft(nextStep.durationMin * 60);
+      } else {
+        setTimerSecondsLeft(null);
+      }
       setTimerRunning(false);
     }
-  }, [currentStepIndex]); // reset timer when navigating between steps
+  }, [steps]);
 
   // ─── Step countdown timer ───
   useEffect(() => {
@@ -183,12 +190,12 @@ export default function TrialRunnerClient({ id }: { id: string }) {
       playBeep();
       const timeout = setTimeout(() => {
         if (currentStepIndex < steps.length - 1) {
-          setCurrentStepIndex((prev) => prev + 1);
+          goToStep(currentStepIndex + 1);
         }
       }, AUTO_ADVANCE_DELAY_MS);
       return () => clearTimeout(timeout);
     }
-  }, [timerSecondsLeft, timerRunning, currentStepIndex, steps.length]);
+  }, [timerSecondsLeft, timerRunning, currentStepIndex, steps.length, goToStep]);
 
   // ─── Elapsed time since trial start ───
   useEffect(() => {
@@ -270,12 +277,6 @@ export default function TrialRunnerClient({ id }: { id: string }) {
     setTimerRunning(false);
     if (currentStep?.durationMin) {
       setTimerSecondsLeft(currentStep.durationMin * 60);
-    }
-  }
-
-  function goToStep(idx: number) {
-    if (idx >= 0 && idx < steps.length) {
-      setCurrentStepIndex(idx);
     }
   }
 
