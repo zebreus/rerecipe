@@ -32,7 +32,9 @@ export function SpaRedirectHandler() {
         const params = new URLSearchParams();
         params.set("id", id);
         new URLSearchParams(query).forEach((value, key) => {
-          params.append(key, value);
+          if (key !== "id") {
+            params.append(key, value);
+          }
         });
         path = `/${resource}?${params.toString()}${pathHash}`;
       }
