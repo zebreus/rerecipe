@@ -354,6 +354,7 @@ export default function IngredientsPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7"
+                                aria-label={`Edit ${ing.name}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   openEdit(ing);
@@ -365,6 +366,7 @@ export default function IngredientsPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-red-500"
+                                aria-label={`Delete ${ing.name}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleDelete(ing.id);

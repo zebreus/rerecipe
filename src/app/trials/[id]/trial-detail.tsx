@@ -170,7 +170,7 @@ export default function TrialDetailClient({ id }: { id: string }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/trials">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Back to trials">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
@@ -381,6 +381,7 @@ export default function TrialDetailClient({ id }: { id: string }) {
                       size="icon"
                       className="h-8 w-8 text-red-500 dark:text-red-400 shrink-0"
                       onClick={() => removeObservation(idx)}
+                      aria-label={`Remove observation ${obs.category}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -443,6 +444,7 @@ export default function TrialDetailClient({ id }: { id: string }) {
                       size="icon"
                       className="h-8 w-8 text-red-500 dark:text-red-400 shrink-0"
                       onClick={() => removeMeasurement(idx)}
+                      aria-label={`Remove measurement ${m.name || idx + 1}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>

@@ -158,7 +158,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/formulas">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Back to formulas">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
@@ -278,6 +278,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7"
+                                    aria-label={line.locked ? `Unlock ${ing?.name ?? "ingredient"}` : `Lock ${ing?.name ?? "ingredient"}`}
                                     onClick={() =>
                                       updateLine(idx, {
                                         locked: !line.locked,
@@ -296,6 +297,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 text-red-500 dark:text-red-400"
+                                    aria-label={`Remove ${ing?.name ?? "ingredient"}`}
                                     onClick={() => removeLine(idx)}
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
@@ -447,7 +449,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                     <YAxis
                       type="category"
                       dataKey="name"
-                      width={100}
+                      width={150}
                       tick={{ fontSize: 10 }}
                     />
                     <Tooltip />

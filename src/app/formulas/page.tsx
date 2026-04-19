@@ -248,7 +248,13 @@ export default function FormulasPage() {
             : "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
         }`}>
           <span>{feedbackMsg.text}</span>
-          <button onClick={() => setFeedbackMsg(null)} className="ml-2 hover:opacity-70">✕</button>
+          <button
+            onClick={() => setFeedbackMsg(null)}
+            className="ml-2 hover:opacity-70"
+            aria-label="Dismiss message"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -300,6 +306,7 @@ export default function FormulasPage() {
                         className="h-7 w-7 text-gray-500 dark:text-gray-400"
                         onClick={() => handleCreateVariations(f)}
                         title="Create Variations"
+                        aria-label={`Create variations of ${f.name}`}
                       >
                         <GitBranch className="h-3.5 w-3.5" />
                       </Button>
@@ -309,6 +316,7 @@ export default function FormulasPage() {
                         className="h-7 w-7 text-gray-500 dark:text-gray-400"
                         onClick={() => handleDuplicate(f)}
                         title="Duplicate"
+                        aria-label={`Duplicate ${f.name}`}
                       >
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
@@ -317,6 +325,7 @@ export default function FormulasPage() {
                         size="icon"
                         className="h-7 w-7 text-red-500 dark:text-red-400"
                         onClick={() => handleDelete(f.id)}
+                        aria-label={`Delete ${f.name}`}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -337,6 +346,7 @@ export default function FormulasPage() {
                     </Badge>
                     <Badge
                       variant={sim > 80 ? "default" : "outline"}
+                      title="Composition match vs target product"
                     >
                       {sim.toFixed(0)}% match
                     </Badge>

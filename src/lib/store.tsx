@@ -46,7 +46,15 @@ function saveData(data: ProjectData) {
     ...data,
     project: { ...data.project, updatedAt: new Date().toISOString() },
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "QuotaExceededError") {
+      console.error("Storage quota exceeded. Please export your project data and use Settings → Reset to free space.");
+    } else {
+      console.error("Failed to save project data to localStorage:", e);
+    }
+  }
 }
 
 interface StoreContextValue {

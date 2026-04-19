@@ -141,6 +141,7 @@ export default function ProtocolsPage() {
                         size="sm"
                         className="text-xs"
                         onClick={() => handleDuplicate(p)}
+                        aria-label={`Duplicate ${p.name}`}
                       >
                         Duplicate
                       </Button>
@@ -149,6 +150,7 @@ export default function ProtocolsPage() {
                         size="icon"
                         className="h-7 w-7 text-red-500 dark:text-red-400"
                         onClick={() => handleDelete(p.id)}
+                        aria-label={`Delete ${p.name}`}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>

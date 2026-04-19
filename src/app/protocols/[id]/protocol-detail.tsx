@@ -131,7 +131,7 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/protocols">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Back to protocols">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
@@ -301,6 +301,7 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
                       className="h-7 w-7"
                       disabled={idx === 0}
                       onClick={() => moveStep(idx, "up")}
+                      aria-label={`Move step ${step.name || idx + 1} up`}
                     >
                       <ChevronUp className="h-3.5 w-3.5" />
                     </Button>
@@ -310,6 +311,7 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
                       className="h-7 w-7"
                       disabled={idx === local.steps.length - 1}
                       onClick={() => moveStep(idx, "down")}
+                      aria-label={`Move step ${step.name || idx + 1} down`}
                     >
                       <ChevronDown className="h-3.5 w-3.5" />
                     </Button>
@@ -318,6 +320,7 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
                       size="icon"
                       className="h-7 w-7 text-red-500 dark:text-red-400"
                       onClick={() => removeStep(idx)}
+                      aria-label={`Remove step ${step.name || idx + 1}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>

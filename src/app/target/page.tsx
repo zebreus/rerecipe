@@ -279,6 +279,7 @@ export default function TargetPage() {
                               removeAttribute(category, idx)
                             }
                             className="ml-0.5 hover:text-red-600 dark:hover:text-red-400"
+                            aria-label={`Remove ${attr}`}
                           >
                             <X className="h-3 w-3" />
                           </button>
@@ -303,6 +304,7 @@ export default function TargetPage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      aria-label={`Add ${category} attribute`}
                       onClick={() =>
                         addAttribute(category, newAttrValues[category] || "")
                       }

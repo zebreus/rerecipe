@@ -235,6 +235,7 @@ export default function TrialsPage() {
                         className="h-7 w-7 text-gray-500 dark:text-gray-400"
                         onClick={() => handleDuplicate(trial)}
                         title="Duplicate"
+                        aria-label={`Duplicate Trial #${trial.runNumber}`}
                       >
                         <Copy className="h-3.5 w-3.5" />
                       </Button>
@@ -243,6 +244,7 @@ export default function TrialsPage() {
                         size="icon"
                         className="h-7 w-7 text-red-500 dark:text-red-400"
                         onClick={() => handleDelete(trial.id)}
+                        aria-label={`Delete Trial #${trial.runNumber}`}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
