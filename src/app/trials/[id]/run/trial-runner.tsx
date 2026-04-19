@@ -98,6 +98,9 @@ function agitationColor(level: string): string {
   }
 }
 
+const AUTO_ADVANCE_DELAY_MS = 1500;
+const DEFAULT_OBSERVATION_CATEGORY = "General";
+
 export default function TrialRunnerClient({ id }: { id: string }) {
   const { data, updateTrial } = useStore();
 
@@ -154,7 +157,7 @@ export default function TrialRunnerClient({ id }: { id: string }) {
       setTimerSecondsLeft(null);
       setTimerRunning(false);
     }
-  }, [currentStep?.id, currentStep?.durationMin]);
+  }, [currentStepIndex]); // reset timer when navigating between steps
 
   // ─── Step countdown timer ───
   useEffect(() => {
@@ -178,12 +181,11 @@ export default function TrialRunnerClient({ id }: { id: string }) {
   useEffect(() => {
     if (timerSecondsLeft === 0 && !timerRunning) {
       playBeep();
-      // Auto-advance after a short delay
       const timeout = setTimeout(() => {
         if (currentStepIndex < steps.length - 1) {
           setCurrentStepIndex((prev) => prev + 1);
         }
-      }, 1500);
+      }, AUTO_ADVANCE_DELAY_MS);
       return () => clearTimeout(timeout);
     }
   }, [timerSecondsLeft, timerRunning, currentStepIndex, steps.length]);
@@ -244,7 +246,7 @@ export default function TrialRunnerClient({ id }: { id: string }) {
     const text = observationText.trim();
     if (!text) return;
     const obs: TrialObservation = {
-      category: currentStep ? currentStep.name : "General",
+      category: currentStep ? currentStep.name : DEFAULT_OBSERVATION_CATEGORY,
       value: text,
       timestamp: new Date().toISOString(),
       stepId: currentStep?.id,
@@ -549,7 +551,9 @@ export default function TrialRunnerClient({ id }: { id: string }) {
                       {/* Timer */}
                       {isStarted &&
                         step.durationMin !== null &&
-                        timerSecondsLeft !== null && (
+                        timerSecondsLeft !== null && (() => {
+                          const totalSeconds = step.durationMin! * 60;
+                          return (
                           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
                             <div className="text-center">
                               <p className="text-4xl font-mono font-bold text-gray-900 dark:text-gray-100">
@@ -557,10 +561,9 @@ export default function TrialRunnerClient({ id }: { id: string }) {
                               </p>
                               <Progress
                                 value={
-                                  step.durationMin
-                                    ? ((step.durationMin * 60 -
-                                        timerSecondsLeft) /
-                                        (step.durationMin * 60)) *
+                                  totalSeconds
+                                    ? ((totalSeconds - timerSecondsLeft) /
+                                        totalSeconds) *
                                       100
                                     : 0
                                 }
@@ -609,7 +612,8 @@ export default function TrialRunnerClient({ id }: { id: string }) {
                               </p>
                             )}
                           </div>
-                        )}
+                          );
+                        })()}
 
                       {/* Step navigation */}
                       {isStarted && (
