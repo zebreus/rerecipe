@@ -938,7 +938,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
             <DialogTitle>Confirm Changes</DialogTitle>
             <DialogDescription>
               This formula is referenced by {relatedTrials.length} trial{relatedTrials.length !== 1 ? "s" : ""}.
-              Saving changes will update the formula but existing trial results will remain as they were.
+              Saving changes will update this formula, and existing trials that reference it may reflect those updated values.
               The formula version will be incremented.
             </DialogDescription>
           </DialogHeader>

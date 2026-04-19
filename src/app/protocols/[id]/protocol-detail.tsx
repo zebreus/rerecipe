@@ -689,7 +689,7 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
             <DialogTitle>Confirm Changes</DialogTitle>
             <DialogDescription>
               This protocol is referenced by {relatedTrials.length} trial{relatedTrials.length !== 1 ? "s" : ""}.
-              Saving changes will update the protocol but existing trial results will remain as they were.
+              Saving changes will update this protocol, and existing trials that reference it may display the updated protocol details.
               The protocol version will be incremented.
             </DialogDescription>
           </DialogHeader>
