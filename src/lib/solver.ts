@@ -138,8 +138,8 @@ export function compositionSimilarity(
   let totalWeight = 0;
   for (const key of COMPONENT_KEYS) {
     const diff = Math.abs(a[key] - b[key]);
-    // Use 0.1 as floor to prevent division by zero for trace components (e.g. salt at 0%)
-    // while still giving them low weight relative to major components
+    // Floor at 0.1 so trace components (e.g. salt at 0%) still get a small
+    // but nonzero weight in the weighted error sum
     const weight = Math.max(a[key], b[key], 0.1);
     weightedError += diff * weight;
     totalWeight += weight;

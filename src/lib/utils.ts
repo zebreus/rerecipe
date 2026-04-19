@@ -55,7 +55,7 @@ export function statusColor(
 
 /** Generate a timestamped export filename from a project name. */
 export function exportFilename(projectName: string): string {
-  const safeName = projectName.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+  const safeName = projectName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "project";
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
   return `${safeName}-${timestamp}.json`;
 }
@@ -65,7 +65,7 @@ export function describeImportError(text: string): string | null {
   try {
     const parsed = JSON.parse(text);
     const requiredFields = ["project", "ingredients", "formulas", "protocols", "trials", "targetProduct"];
-    const missing = requiredFields.filter((f) => !parsed[f]);
+    const missing = requiredFields.filter((f) => !(f in parsed));
     if (missing.length > 0) {
       return `Import failed. Missing required field(s): ${missing.map((f) => `'${f}'`).join(", ")}.`;
     }

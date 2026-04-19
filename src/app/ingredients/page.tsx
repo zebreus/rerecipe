@@ -229,7 +229,9 @@ export default function IngredientsPage() {
     const ingName = data.ingredients.find((i) => i.id === id)?.name || "this ingredient";
     let msg = `Delete "${ingName}"?`;
     if (usedInFormulas.length > 0) {
-      msg += `\n\nWarning: This ingredient is used in ${usedInFormulas.length} formula(s): ${usedInFormulas.map((f) => f.name).join(", ")}.\nDeleting it will cause those formulas to have missing ingredient references.`;
+      const names = usedInFormulas.slice(0, 5).map((f) => f.name).join(", ");
+      const extra = usedInFormulas.length > 5 ? ` and ${usedInFormulas.length - 5} more` : "";
+      msg += `\n\nWarning: This ingredient is used in ${usedInFormulas.length} formula(s): ${names}${extra}.\nDeleting it will cause those formulas to have missing ingredient references.`;
     }
     if (confirm(msg)) {
       deleteIngredient(id);
