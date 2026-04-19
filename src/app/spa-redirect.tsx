@@ -23,7 +23,24 @@ export function SpaRedirectHandler() {
         .join("?");
       let path = "/" + decoded + hash;
 
-      // Convert dynamic routes to query-param format for static export compatibility
+      // Convert /trials/[id]/run to /trials?id=[id]&mode=run
+      const runMatch = path.match(
+        /^\/(trials)\/([^/?#]+)\/run\/?(?:\?([^#]*))?(#.*)?$/,
+      );
+      if (runMatch) {
+        const [, , id, query = "", pathHash = ""] = runMatch;
+        const params = new URLSearchParams();
+        params.set("id", id);
+        params.set("mode", "run");
+        new URLSearchParams(query).forEach((value, key) => {
+          if (key !== "id" && key !== "mode") {
+            params.append(key, value);
+          }
+        });
+        path = `/trials?${params.toString()}${pathHash}`;
+      }
+
+      // Convert /formulas/[id], /protocols/[id], /trials/[id] to query-param format
       const dynamicMatch = path.match(
         /^\/(formulas|protocols|trials)\/([^/?#]+)\/?(?:\?([^#]*))?(#.*)?$/,
       );
