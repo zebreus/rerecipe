@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { useStore } from "@/lib/store";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ import {
   COMPONENT_KEYS,
   COMPONENT_LABELS,
 } from "@/lib/types";
+import FormulaDetailClient from "./[id]/formula-detail";
 import {
   BarChart,
   Bar,
@@ -53,6 +55,25 @@ import {
 } from "recharts";
 
 export default function FormulasPage() {
+  return (
+    <Suspense>
+      <FormulasRouter />
+    </Suspense>
+  );
+}
+
+function FormulasRouter() {
+  const searchParams = useSearchParams();
+  const detailId = searchParams.get("id");
+
+  if (detailId) {
+    return <FormulaDetailClient id={detailId} />;
+  }
+
+  return <FormulasListView />;
+}
+
+function FormulasListView() {
   const { data, addFormula, addFormulas, deleteFormula } = useStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -294,7 +315,7 @@ export default function FormulasPage() {
               <Card key={f.id} className="hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <Link href={`/formulas/${f.id}`}>
+                    <Link href={`/formulas?id=${f.id}`}>
                       <CardTitle className="text-base text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer">
                         {f.name}
                       </CardTitle>
@@ -374,7 +395,7 @@ export default function FormulasPage() {
                       Confidence: {(f.confidence * 100).toFixed(0)}%
                     </span>
                   </div>
-                  <Link href={`/formulas/${f.id}`}>
+                  <Link href={`/formulas?id=${f.id}`}>
                     <Button variant="outline" size="sm" className="mt-1">
                       Open
                     </Button>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useStore } from "@/lib/store";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ import Link from "next/link";
 import { Plus, Trash2, ListChecks } from "lucide-react";
 import { generateId } from "@/lib/utils";
 import type { Protocol, ProtocolCategory } from "@/lib/types";
+import ProtocolDetailClient from "./[id]/protocol-detail";
 
 const CATEGORIES: { value: ProtocolCategory; label: string }[] = [
   { value: "hot-fill", label: "Hot Fill" },
@@ -41,6 +43,25 @@ const CATEGORIES: { value: ProtocolCategory; label: string }[] = [
 ];
 
 export default function ProtocolsPage() {
+  return (
+    <Suspense>
+      <ProtocolsRouter />
+    </Suspense>
+  );
+}
+
+function ProtocolsRouter() {
+  const searchParams = useSearchParams();
+  const detailId = searchParams.get("id");
+
+  if (detailId) {
+    return <ProtocolDetailClient id={detailId} />;
+  }
+
+  return <ProtocolsListView />;
+}
+
+function ProtocolsListView() {
   const { data, addProtocol, deleteProtocol } = useStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -130,7 +151,7 @@ export default function ProtocolsPage() {
               <Card key={p.id} className="hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <Link href={`/protocols/${p.id}`}>
+                    <Link href={`/protocols?id=${p.id}`}>
                       <CardTitle className="text-base text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer">
                         {p.name}
                       </CardTitle>
@@ -186,7 +207,7 @@ export default function ProtocolsPage() {
                       ))}
                     </div>
                   )}
-                  <Link href={`/protocols/${p.id}`}>
+                  <Link href={`/protocols?id=${p.id}`}>
                     <Button variant="outline" size="sm" className="mt-1">
                       Open
                     </Button>

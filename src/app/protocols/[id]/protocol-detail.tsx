@@ -537,14 +537,14 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
                   return (
                     <div key={trial.id} className="flex items-center justify-between border-b last:border-0 pb-2 last:pb-0">
                       <div className="flex items-center gap-3">
-                        <Link href={`/trials/${trial.id}`} className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                        <Link href={`/trials?id=${trial.id}`} className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
                           Trial #{trial.runNumber}
                         </Link>
                         <Badge className={statusColor(trial.status)} variant="outline">
                           {trial.status}
                         </Badge>
                         {trialFormula && (
-                          <Link href={`/formulas/${trialFormula.id}`}>
+                          <Link href={`/formulas?id=${trialFormula.id}`}>
                             <Badge variant="secondary" className="text-xs hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer">
                               {trialFormula.name}
                             </Badge>

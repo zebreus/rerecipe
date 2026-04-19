@@ -307,7 +307,7 @@ export default function AnalysisPage() {
                           </td>
                           <td className="py-2">
                             <Link
-                              href={`/trials/${row.trialId}`}
+                              href={`/trials?id=${row.trialId}`}
                               className={LINK_STYLE}
                             >
                               Trial #{row.trial.runNumber}
@@ -316,7 +316,7 @@ export default function AnalysisPage() {
                           <td className="py-2">
                             {row.formula ? (
                               <Link
-                                href={`/formulas/${row.formula.id}`}
+                                href={`/formulas?id=${row.formula.id}`}
                                 className={LINK_STYLE}
                               >
                                 {row.formula.name}
@@ -326,7 +326,7 @@ export default function AnalysisPage() {
                           <td className="py-2">
                             {row.protocol ? (
                               <Link
-                                href={`/protocols/${row.protocol.id}`}
+                                href={`/protocols?id=${row.protocol.id}`}
                                 className={LINK_STYLE}
                               >
                                 {row.protocol.name}
@@ -412,7 +412,7 @@ export default function AnalysisPage() {
                         <th className="pb-2 font-medium">Target</th>
                         {formulas.map((f) => (
                           <th key={f.id} className="pb-2 font-medium">
-                            <Link href={`/formulas/${f.id}`} className={LINK_STYLE}>
+                            <Link href={`/formulas?id=${f.id}`} className={LINK_STYLE}>
                               {f.name}
                             </Link>
                           </th>
@@ -491,7 +491,7 @@ export default function AnalysisPage() {
                     return (
                       <div key={f.id} className="border rounded-lg p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <Link href={`/formulas/${f.id}`} className={`font-medium ${LINK_STYLE}`}>{f.name}</Link>
+                          <Link href={`/formulas?id=${f.id}`} className={`font-medium ${LINK_STYLE}`}>{f.name}</Link>
                           <span
                             className={`text-xs px-2 py-1 rounded-full font-medium ${
                               compliance.status === "compliant"

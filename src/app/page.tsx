@@ -186,12 +186,12 @@ export default function DashboardPage() {
                 {bestFormula && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Formula:{" "}
-                    <Link href={`/formulas/${bestFormula.id}`} className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                    <Link href={`/formulas?id=${bestFormula.id}`} className="text-indigo-600 dark:text-indigo-400 hover:underline">
                       {bestFormula.name}
                     </Link>
                   </p>
                 )}
-                <Link href={`/trials/${bestTrial.id}`}>
+                <Link href={`/trials?id=${bestTrial.id}`}>
                   <Button variant="outline" size="sm" className="mt-2">
                     View Trial
                   </Button>
@@ -332,7 +332,7 @@ export default function DashboardPage() {
                       <tr key={p.id} className="border-b last:border-0">
                         <td className="py-2">
                           <Link
-                            href={`/protocols/${p.id}`}
+                            href={`/protocols?id=${p.id}`}
                             className="text-indigo-600 dark:text-indigo-400 hover:underline"
                           >
                             {p.name}

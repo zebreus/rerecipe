@@ -197,7 +197,7 @@ export default function TrialDetailClient({ id }: { id: string }) {
           <CardContent className="pt-4">
             <p className="text-xs text-gray-500 dark:text-gray-400">Formula</p>
             {formula ? (
-              <Link href={`/formulas/${formula.id}`} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+              <Link href={`/formulas?id=${formula.id}`} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
                 {formula.name}
               </Link>
             ) : (
@@ -209,7 +209,7 @@ export default function TrialDetailClient({ id }: { id: string }) {
           <CardContent className="pt-4">
             <p className="text-xs text-gray-500 dark:text-gray-400">Protocol</p>
             {protocol ? (
-              <Link href={`/protocols/${protocol.id}`} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+              <Link href={`/protocols?id=${protocol.id}`} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
                 {protocol.name}
               </Link>
             ) : (

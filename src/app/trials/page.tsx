@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useStore } from "@/lib/store";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,10 +30,30 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import type { Trial } from "@/lib/types";
 import { calculateSimilarityScore } from "@/lib/solver";
+import TrialDetailClient from "./[id]/trial-detail";
 
 const STATUS_OPTIONS = ["all", "planned", "in-progress", "completed", "failed", "abandoned"] as const;
 
 export default function TrialsPage() {
+  return (
+    <Suspense>
+      <TrialsRouter />
+    </Suspense>
+  );
+}
+
+function TrialsRouter() {
+  const searchParams = useSearchParams();
+  const detailId = searchParams.get("id");
+
+  if (detailId) {
+    return <TrialDetailClient id={detailId} />;
+  }
+
+  return <TrialsListView />;
+}
+
+function TrialsListView() {
   const { data, addTrial, deleteTrial } = useStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newFormulaId, setNewFormulaId] = useState("");
@@ -204,7 +225,7 @@ export default function TrialsPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div>
-                        <Link href={`/trials/${trial.id}`}>
+                        <Link href={`/trials?id=${trial.id}`}>
                           <p className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
                             Trial #{trial.runNumber}
                           </p>
@@ -252,14 +273,14 @@ export default function TrialsPage() {
                   </div>
                   <div className="flex gap-2 mt-2 flex-wrap">
                     {formula && (
-                      <Link href={`/formulas/${formula.id}`}>
+                      <Link href={`/formulas?id=${formula.id}`}>
                         <Badge variant="secondary" className="text-xs hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer">
                           {formula.name}
                         </Badge>
                       </Link>
                     )}
                     {protocol && (
-                      <Link href={`/protocols/${protocol.id}`}>
+                      <Link href={`/protocols?id=${protocol.id}`}>
                         <Badge variant="secondary" className="text-xs hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer">
                           {protocol.name}
                         </Badge>
