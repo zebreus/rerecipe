@@ -577,7 +577,7 @@ export default function AnalysisPage() {
               {completedTrials.length > 0 && (
                 <div className="mb-4">
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                    Select trials to compare (click to toggle, or leave all unselected for top 3):
+                    Select trials to compare (click to toggle, max 6; leave all unselected for top 3):
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {completedTrials.map((t) => {
@@ -586,13 +586,11 @@ export default function AnalysisPage() {
                         <button
                           key={t.id}
                           onClick={() => {
-                            setRadarTrialIds((prev) =>
-                              isSelected
-                                ? prev.filter((id) => id !== t.id)
-                                : prev.length >= 6
-                                ? prev
-                                : [...prev, t.id]
-                            );
+                            setRadarTrialIds((prev) => {
+                              if (isSelected) return prev.filter((id) => id !== t.id);
+                              if (prev.length >= 6) return prev;
+                              return [...prev, t.id];
+                            });
                           }}
                           className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                             isSelected
@@ -628,16 +626,19 @@ export default function AnalysisPage() {
                       domain={[0, 10]}
                       tick={{ fontSize: 9 }}
                     />
-                    {selectedRadarTrials.map((t, idx) => (
-                      <Radar
-                        key={t.id}
-                        name={`Trial #${t.runNumber}`}
-                        dataKey={`Trial #${t.runNumber}`}
-                        stroke={CHART_COLORS[idx % CHART_COLORS.length]}
-                        fill={CHART_COLORS[idx % CHART_COLORS.length]}
-                        fillOpacity={0.15}
-                      />
-                    ))}
+                    {selectedRadarTrials.map((t, idx) => {
+                      const color = CHART_COLORS[idx % CHART_COLORS.length];
+                      return (
+                        <Radar
+                          key={t.id}
+                          name={`Trial #${t.runNumber}`}
+                          dataKey={`Trial #${t.runNumber}`}
+                          stroke={color}
+                          fill={color}
+                          fillOpacity={0.15}
+                        />
+                      );
+                    })}
                     <Legend />
                     <Tooltip />
                   </RadarChart>
