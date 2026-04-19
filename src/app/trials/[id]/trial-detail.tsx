@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
-import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Play } from "lucide-react";
 import type {
   Trial,
   TrialObservation,
@@ -201,9 +201,18 @@ export default function TrialDetailClient({ id }: { id: string }) {
             </div>
           </div>
         </div>
-        <Button onClick={save} disabled={!dirty}>
-          <Save className="h-4 w-4 mr-1" /> Save
-        </Button>
+        <div className="flex gap-2">
+          {protocol && (
+            <Link href={`/trials/${local.id}/run?id=${local.id}`}>
+              <Button variant="outline">
+                <Play className="h-4 w-4 mr-1" /> Run Trial
+              </Button>
+            </Link>
+          )}
+          <Button onClick={save} disabled={!dirty}>
+            <Save className="h-4 w-4 mr-1" /> Save
+          </Button>
+        </div>
       </div>
 
       {/* Summary */}
