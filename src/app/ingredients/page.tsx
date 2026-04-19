@@ -635,7 +635,10 @@ export default function IngredientsPage() {
       </Dialog>
 
       {/* Quick Add Dialog */}
-      <Dialog open={quickAddOpen} onOpenChange={(open) => { setQuickAddOpen(open); if (!open) setLastQuickAdded(null); }}>
+      <Dialog open={quickAddOpen} onOpenChange={(open) => {
+        setQuickAddOpen(open);
+        if (!open) setLastQuickAdded(null);
+      }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Quick Add Common Ingredient</DialogTitle>
