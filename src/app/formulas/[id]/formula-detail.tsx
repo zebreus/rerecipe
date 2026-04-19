@@ -14,10 +14,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, Save, Lock, Unlock, Printer } from "lucide-react";
-import type { Formula, FormulaLine } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Plus, Trash2, Save, Lock, Unlock, Printer, TestTube, AlertTriangle } from "lucide-react";
+import type { Formula, FormulaLine, Trial } from "@/lib/types";
 import {
   COMPONENT_KEYS,
   COMPONENT_LABELS,
@@ -33,7 +42,7 @@ import {
   checkCompliance,
 } from "@/lib/solver";
 import { Badge } from "@/components/ui/badge";
-import { statusColor } from "@/lib/utils";
+import { generateId, statusColor } from "@/lib/utils";
 import {
   BarChart,
   Bar,
@@ -46,13 +55,20 @@ import {
 } from "recharts";
 
 export default function FormulaDetailClient({ id }: { id: string }) {
-  const { data, updateFormula } = useStore();
+  const { data, updateFormula, addTrial } = useStore();
+  const router = useRouter();
 
   const formula = data.formulas.find((f) => f.id === id);
   const [local, setLocal] = useState<Formula | null>(formula ? { ...formula } : null);
   const [dirty, setDirty] = useState(false);
   const [sensitivityIngId, setSensitivityIngId] = useState<string>("");
   const [sensitivityDelta, setSensitivityDelta] = useState(10);
+  const [trialDialogOpen, setTrialDialogOpen] = useState(false);
+  const [newTrialProtocolId, setNewTrialProtocolId] = useState("");
+  const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
+
+  const relatedTrials = data.trials.filter((t) => t.formulaId === id);
+  const hasTrials = relatedTrials.length > 0;
 
   if (!local || !formula) {
     return (
@@ -69,11 +85,53 @@ export default function FormulaDetailClient({ id }: { id: string }) {
 
   const ingredients = data.ingredients;
 
+  function handleSaveClick() {
+    if (hasTrials) {
+      setConfirmSaveOpen(true);
+    } else {
+      save();
+    }
+  }
+
   function save() {
     if (!local) return;
     updateFormula({ ...local, version: local.version + 1 });
     setLocal({ ...local, version: local.version + 1 });
     setDirty(false);
+    setConfirmSaveOpen(false);
+  }
+
+  function handleCreateTrial() {
+    if (!newTrialProtocolId || !local) return;
+    const now = new Date().toISOString();
+    const runNumber = data.trials.filter((t) => t.formulaId === local.id).length + 1;
+    const t: Trial = {
+      id: generateId(),
+      formulaId: local.id,
+      protocolId: newTrialProtocolId,
+      runNumber,
+      status: "planned",
+      actualParameters: {},
+      observations: [],
+      measurements: [],
+      scores: data.scoringProfiles[0]?.dimensions.map((d) => ({
+        name: d.name,
+        score: 0,
+        weight: d.weight,
+        notes: "",
+      })) || [],
+      similarityScore: 0,
+      attachmentIds: [],
+      notes: "",
+      startedAt: "",
+      completedAt: "",
+      createdAt: now,
+      updatedAt: now,
+    };
+    addTrial(t);
+    setTrialDialogOpen(false);
+    setNewTrialProtocolId("");
+    router.push(`/trials?id=${t.id}`);
   }
 
   function update(partial: Partial<Formula>) {
@@ -172,15 +230,34 @@ export default function FormulaDetailClient({ id }: { id: string }) {
         <div className="flex gap-2">
           <Button
             variant="outline"
+            onClick={() => {
+              setNewTrialProtocolId("");
+              setTrialDialogOpen(true);
+            }}
+          >
+            <TestTube className="h-4 w-4 mr-1" /> Create Trial
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => window.print()}
           >
             <Printer className="h-4 w-4 mr-1" /> Print
           </Button>
-          <Button onClick={save} disabled={!dirty}>
+          <Button onClick={handleSaveClick} disabled={!dirty}>
             <Save className="h-4 w-4 mr-1" /> Save
           </Button>
         </div>
       </div>
+
+      {/* Warning banner for formulas with trials */}
+      {hasTrials && (
+        <div className="rounded-md px-4 py-3 text-sm bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            This formula is referenced by {relatedTrials.length} trial{relatedTrials.length !== 1 ? "s" : ""}. Editing it may affect trial data integrity.
+          </span>
+        </div>
+      )}
 
       <Tabs defaultValue="builder">
         <TabsList>
@@ -817,6 +894,64 @@ export default function FormulaDetailClient({ id }: { id: string }) {
           </Card>
         );
       })()}
+      {/* Create Trial Dialog */}
+      <Dialog open={trialDialogOpen} onOpenChange={setTrialDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Trial</DialogTitle>
+            <DialogDescription>
+              Create a new trial for &quot;{local.name}&quot;. Select a protocol to test with.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Protocol</Label>
+              <Select value={newTrialProtocolId} onValueChange={setNewTrialProtocolId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select protocol..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {data.protocols.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTrialDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateTrial} disabled={!newTrialProtocolId}>
+              Create Trial
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Save Dialog */}
+      <Dialog open={confirmSaveOpen} onOpenChange={setConfirmSaveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Changes</DialogTitle>
+            <DialogDescription>
+              This formula is referenced by {relatedTrials.length} trial{relatedTrials.length !== 1 ? "s" : ""}.
+              Saving changes will update the formula but existing trial results will remain as they were.
+              The formula version will be incremented.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSaveOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={save}>
+              Save Anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -89,6 +89,21 @@ export default function TrialDetailClient({ id }: { id: string }) {
     setDirty(true);
   }
 
+  // ─── Step Findings ───
+  function addStepFinding(stepId: string, stepName: string) {
+    update({
+      observations: [
+        ...local!.observations,
+        {
+          category: stepName,
+          value: "",
+          timestamp: new Date().toISOString(),
+          stepId,
+        },
+      ],
+    });
+  }
+
   // ─── Observations ───
   function addObservation() {
     update({
@@ -244,6 +259,7 @@ export default function TrialDetailClient({ id }: { id: string }) {
       <Tabs defaultValue="scoring">
         <TabsList>
           <TabsTrigger value="scoring">Scoring</TabsTrigger>
+          <TabsTrigger value="execution">Execution</TabsTrigger>
           <TabsTrigger value="observations">Observations</TabsTrigger>
           <TabsTrigger value="measurements">Measurements</TabsTrigger>
           <TabsTrigger value="parameters">Parameters</TabsTrigger>
@@ -331,6 +347,92 @@ export default function TrialDetailClient({ id }: { id: string }) {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Execution – step-level findings */}
+        <TabsContent value="execution">
+          {!protocol ? (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">
+                  No protocol linked to this trial.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {protocol.steps.map((step) => {
+                const stepFindings = local.observations.filter((o) => o.stepId === step.id);
+                return (
+                  <Card key={step.id}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm">
+                          Step {step.order}: {step.name || "Untitled"}
+                        </CardTitle>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => addStepFinding(step.id, step.name || `Step ${step.order}`)}
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Add Finding
+                        </Button>
+                      </div>
+                      {step.description && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{step.description}</p>
+                      )}
+                      <div className="flex gap-2 flex-wrap mt-1">
+                        {step.temperatureC != null && (
+                          <Badge variant="secondary" className="text-xs">{step.temperatureC}°C</Badge>
+                        )}
+                        {step.durationMin != null && (
+                          <Badge variant="secondary" className="text-xs">{step.durationMin} min</Badge>
+                        )}
+                        {step.agitationLevel !== "none" && (
+                          <Badge variant="secondary" className="text-xs">Agitation: {step.agitationLevel}</Badge>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {stepFindings.length === 0 ? (
+                        <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-2">
+                          No findings recorded for this step.
+                        </p>
+                      ) : (
+                        stepFindings.map((obs) => {
+                          const obsIdx = local.observations.indexOf(obs);
+                          return (
+                            <div key={obsIdx} className="flex items-start gap-2 border rounded p-2">
+                              <Input
+                                className="flex-1 h-8"
+                                placeholder="Finding..."
+                                value={obs.value}
+                                onChange={(e) =>
+                                  updateObservation(obsIdx, { value: e.target.value })
+                                }
+                              />
+                              <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap self-center">
+                                {new Date(obs.timestamp).toLocaleString()}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-500 dark:text-red-400 shrink-0"
+                                onClick={() => removeObservation(obsIdx)}
+                                aria-label="Remove finding"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         {/* Observations */}

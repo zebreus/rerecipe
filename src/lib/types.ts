@@ -146,6 +146,7 @@ export interface TrialObservation {
   category: string;
   value: string;
   timestamp: string;
+  stepId?: string; // optional: links observation to a specific protocol step
 }
 
 export interface TrialMeasurement {
