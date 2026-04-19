@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,16 +34,29 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { Trophy, TrendingUp, BarChart3, Table, Download } from "lucide-react";
+import { Trophy, TrendingUp, BarChart3, Table, Download, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const LINK_STYLE = "text-indigo-600 dark:text-indigo-400 hover:underline";
 
 export default function AnalysisPage() {
   const { data } = useStore();
   const { targetProduct, ingredients, formulas, protocols, trials } = data;
+  const [protocolFilter, setProtocolFilter] = useState<string>("all");
+  const [radarTrialIds, setRadarTrialIds] = useState<string[]>([]);
 
-  const rankings = rankTrials(trials, formulas, ingredients, targetProduct);
+  const filteredTrials = protocolFilter === "all"
+    ? trials
+    : trials.filter((t) => t.protocolId === protocolFilter);
+
+  const rankings = rankTrials(filteredTrials, formulas, ingredients, targetProduct);
 
   // ─── Ranking table ───
   const rankingRows = rankings.map((r, idx) => {
@@ -59,7 +73,7 @@ export default function AnalysisPage() {
   });
 
   // ─── Trial progression ───
-  const progressionData = trials
+  const progressionData = filteredTrials
     .filter((t) => t.status === "completed")
     .sort(
       (a, b) =>
@@ -86,21 +100,22 @@ export default function AnalysisPage() {
     return row;
   });
 
-  // ─── Trial radar comparison (top 3) ───
-  const topTrials = rankings.slice(0, 3);
+  // ─── Trial radar comparison (selectable or top 3) ───
+  const completedTrials = filteredTrials.filter((t) => t.status === "completed");
+  const selectedRadarTrials = radarTrialIds.length > 0
+    ? completedTrials.filter((t) => radarTrialIds.includes(t.id))
+    : rankings.slice(0, 3).map((r) => completedTrials.find((t) => t.id === r.trialId)!).filter(Boolean);
   const allDimensions = new Set<string>();
-  topTrials.forEach((r) => {
-    const t = trials.find((tr) => tr.id === r.trialId);
+  selectedRadarTrials.forEach((t) => {
     t?.scores.forEach((s) => allDimensions.add(s.name));
   });
   const radarData = Array.from(allDimensions).map((dim) => {
     const row: Record<string, number | string> = {
       dimension: dim,
     };
-    topTrials.forEach((r, idx) => {
-      const t = trials.find((tr) => tr.id === r.trialId);
+    selectedRadarTrials.forEach((t) => {
       const score = t?.scores.find((s) => s.name === dim)?.score || 0;
-      row[`Trial #${t?.runNumber || idx + 1}`] = score;
+      row[t.id] = score;
     });
     return row;
   });
@@ -212,16 +227,32 @@ export default function AnalysisPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Analysis</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Comparison, ranking, and insights
           </p>
         </div>
-        <Button variant="outline" onClick={exportCSV} disabled={rankingRows.length === 0}>
-          <Download className="h-4 w-4 mr-1" /> Export Report
-        </Button>
+        <div className="flex items-center gap-3">
+          <Select value={protocolFilter} onValueChange={(v) => { setProtocolFilter(v); setRadarTrialIds([]); }}>
+            <SelectTrigger className="w-52">
+              <Filter className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
+              <SelectValue placeholder="All protocols" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All protocols</SelectItem>
+              {protocols.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={exportCSV} disabled={rankingRows.length === 0}>
+            <Download className="h-4 w-4 mr-1" /> Export Report
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="ranking">
@@ -539,10 +570,51 @@ export default function AnalysisPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                Top Trials Score Comparison
+                {radarTrialIds.length > 0 ? "Selected" : "Top"} Trials Score Comparison
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {completedTrials.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    Select trials to compare (click to toggle, max 6; leave all unselected for top 3):
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {completedTrials.map((t) => {
+                      const isSelected = radarTrialIds.includes(t.id);
+                      return (
+                        <button
+                          key={t.id}
+                          aria-pressed={isSelected ? "true" : "false"}
+                          onClick={() => {
+                            setRadarTrialIds((prev) => {
+                              const wasSelected = prev.includes(t.id);
+                              if (wasSelected) return prev.filter((id) => id !== t.id);
+                              if (prev.length >= 6) return prev;
+                              return [...prev, t.id];
+                            });
+                          }}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            isSelected
+                              ? "bg-indigo-100 dark:bg-indigo-900 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 font-medium"
+                              : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600"
+                          }`}
+                        >
+                          Trial #{t.runNumber}
+                        </button>
+                      );
+                    })}
+                    {radarTrialIds.length > 0 && (
+                      <button
+                        onClick={() => setRadarTrialIds([])}
+                        className="text-xs px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               {radarData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={400}>
                   <RadarChart data={radarData}>
@@ -556,15 +628,15 @@ export default function AnalysisPage() {
                       domain={[0, 10]}
                       tick={{ fontSize: 9 }}
                     />
-                    {topTrials.map((r, idx) => {
-                      const t = trials.find((tr) => tr.id === r.trialId);
+                    {selectedRadarTrials.map((t, idx) => {
+                      const color = CHART_COLORS[idx % CHART_COLORS.length];
                       return (
                         <Radar
-                          key={r.trialId}
-                          name={`Trial #${t?.runNumber || idx + 1}`}
-                          dataKey={`Trial #${t?.runNumber || idx + 1}`}
-                          stroke={CHART_COLORS[idx]}
-                          fill={CHART_COLORS[idx]}
+                          key={t.id}
+                          name={`Trial #${t.runNumber}`}
+                          dataKey={t.id}
+                          stroke={color}
+                          fill={color}
                           fillOpacity={0.15}
                         />
                       );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,16 @@ export default function SettingsPage() {
   const [profiles, setProfiles] = useState<ScoringProfile[]>(data.scoringProfiles);
   const [profilesDirty, setProfilesDirty] = useState(false);
 
+  // Sync local state when store data changes (e.g., after import or reset)
+  useEffect(() => {
+    setProjectName(data.project.name);
+  }, [data.project.name]);
+
+  useEffect(() => {
+    setProfiles(data.scoringProfiles);
+    setProfilesDirty(false);
+  }, [data.scoringProfiles]);
+
   function handleSaveName() {
     updateProject(projectName);
   }
@@ -46,13 +56,18 @@ export default function SettingsPage() {
   function handleImport() {
     if (!importText.trim()) return;
     if (!confirm("Importing will replace all current project data. Continue?")) return;
-    const ok = importJSON(importText);
-    if (ok) {
-      setImportStatus("Import successful!");
-      setImportText("");
-      setProjectName(data.project.name);
-    } else {
-      setImportStatus(describeImportError(importText) ?? "Import failed.");
+    try {
+      const parsed = JSON.parse(importText);
+      const ok = importJSON(importText);
+      if (ok) {
+        setImportStatus("Import successful!");
+        setImportText("");
+        setProjectName(parsed.project?.name ?? "");
+      } else {
+        setImportStatus(describeImportError(importText) ?? "Import failed.");
+      }
+    } catch {
+      setImportStatus(describeImportError(importText) ?? "Import failed: invalid JSON.");
     }
   }
 
@@ -63,12 +78,17 @@ export default function SettingsPage() {
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
       if (!confirm("Importing will replace all current project data. Continue?")) return;
-      const ok = importJSON(text);
-      if (ok) {
-        setImportStatus("Import successful!");
-        setProjectName(data.project.name);
-      } else {
-        setImportStatus(describeImportError(text) ?? "Import failed.");
+      try {
+        const parsed = JSON.parse(text);
+        const ok = importJSON(text);
+        if (ok) {
+          setImportStatus("Import successful!");
+          setProjectName(parsed.project?.name ?? "");
+        } else {
+          setImportStatus(describeImportError(text) ?? "Import failed.");
+        }
+      } catch {
+        setImportStatus(describeImportError(text) ?? "Import failed: invalid JSON.");
       }
     };
     reader.readAsText(file);
@@ -81,7 +101,6 @@ export default function SettingsPage() {
       )
     ) {
       resetToSeed();
-      setProjectName(data.project.name);
       setImportStatus(null);
     }
   }
