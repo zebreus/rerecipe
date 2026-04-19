@@ -203,7 +203,7 @@ export default function TrialDetailClient({ id }: { id: string }) {
         </div>
         <div className="flex gap-2">
           {protocol && (
-            <Link href={`/trials/${local.id}/run?id=${local.id}`}>
+            <Link href={`/trials/${local.id}/run`}>
               <Button variant="outline">
                 <Play className="h-4 w-4 mr-1" /> Run Trial
               </Button>

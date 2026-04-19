@@ -199,6 +199,11 @@ export default function TrialRunnerClient({ id }: { id: string }) {
       };
       updateElapsed();
       elapsedRef.current = setInterval(updateElapsed, 1000);
+    } else {
+      if (elapsedRef.current) {
+        clearInterval(elapsedRef.current);
+        elapsedRef.current = null;
+      }
     }
     return () => {
       if (elapsedRef.current) clearInterval(elapsedRef.current);
