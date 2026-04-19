@@ -585,7 +585,7 @@ export default function AnalysisPage() {
                       return (
                         <button
                           key={t.id}
-                          aria-pressed={isSelected}
+                          aria-pressed={isSelected ? "true" : "false"}
                           onClick={() => {
                             setRadarTrialIds((prev) => {
                               const wasSelected = prev.includes(t.id);

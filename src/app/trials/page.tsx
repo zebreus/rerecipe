@@ -121,7 +121,7 @@ export default function TrialsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Trial Log"
-        subtitle={statusFilter !== "all" || protocolFilter !== "all" || searchQuery.trim()
+        subtitle={statusFilter !== "all" || protocolFilter !== "all" || searchQuery.trim().length > 0
           ? `${filteredTrials.length} of ${data.trials.length} trial${data.trials.length !== 1 ? "s" : ""}`
           : `${data.trials.length} trial${data.trials.length !== 1 ? "s" : ""} recorded`}
       >
