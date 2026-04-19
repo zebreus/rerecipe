@@ -205,6 +205,10 @@ export default function HelpPage() {
             <h3 className="font-semibold text-gray-800 dark:text-gray-200">16. Isabelle Dubois — Pastry Competition Coach</h3>
             <p>Isabelle coaches a team preparing for international pastry competitions. She uses the tool to systematically perfect each component of complex desserts—ganache fillings, mousse layers, sponge bases, and glaze coatings. Each component gets its own formula, and she creates protocols for assembly sequences with precise timing and temperatures. The scoring profiles are customized for competition criteria: visual presentation, texture, flavor balance, and technical execution. She exports completed projects as reference archives for future competition teams.</p>
           </div>
+          <div>
+            <h3 className="font-semibold text-gray-800 dark:text-gray-200">17. Marco Rossi — Test Cook (Process Optimization)</h3>
+            <p>Marco is a test cook at a food R&amp;D lab who runs structured process comparisons. For each product iteration, he creates multiple manufacturing protocols (e.g., stovetop vs. pressure cooker vs. sous vide) and then runs exactly three trial replicates per protocol to assess reproducibility. He relies on the protocol page to define distinct processes, creates separate trials linking the same formula to each protocol, and uses the analysis ranking and radar charts to compare outcomes across processes. The trial progression view helps him see whether scores are converging (good reproducibility) or diverging (process instability). He needs to quickly navigate between protocols and their related trials, and uses the side-by-side comparison to ensure that his three replicates per process are consistent before recommending a process for scale-up.</p>
+          </div>
         </CardContent>
       </Card>
     </div>
