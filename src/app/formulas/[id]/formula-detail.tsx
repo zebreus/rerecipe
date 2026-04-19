@@ -449,7 +449,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                     <YAxis
                       type="category"
                       dataKey="name"
-                      width={120}
+                      width={150}
                       tick={{ fontSize: 10 }}
                     />
                     <Tooltip />
