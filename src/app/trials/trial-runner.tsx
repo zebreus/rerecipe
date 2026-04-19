@@ -29,9 +29,20 @@ import type { Trial, TrialObservation, ProtocolStep } from "@/lib/types";
 import { cn, formatDateTime } from "@/lib/utils";
 
 // ─── Web Audio API beep ───
+let sharedAudioCtx: AudioContext | null = null;
+function getAudioContext(): AudioContext {
+  if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
+    sharedAudioCtx = new AudioContext();
+  }
+  return sharedAudioCtx;
+}
+
 function playBeep() {
   try {
-    const ctx = new AudioContext();
+    const ctx = getAudioContext();
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
     oscillator.connect(gain);
@@ -115,10 +126,22 @@ export default function TrialRunnerClient({ id }: { id: string }) {
     [protocol]
   );
 
+  // ─── Infer initial step from most recent observation's stepId ───
+  const inferredStepIndex = useMemo(() => {
+    if (!trial || trial.status !== "in-progress") return 0;
+    const obs = trial.observations;
+    if (!obs || obs.length === 0) return 0;
+    const lastObs = obs[obs.length - 1];
+    if (!lastObs.stepId) return 0;
+    const idx = steps.findIndex((s) => s.id === lastObs.stepId);
+    return idx >= 0 ? idx : 0;
+  }, [trial, steps]);
+
   // ─── State ───
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [currentStepIndex, setCurrentStepIndex] = useState(inferredStepIndex);
+  const initialStep = steps[inferredStepIndex];
   const [timerSecondsLeft, setTimerSecondsLeft] = useState<number | null>(
-    steps[0]?.durationMin ? steps[0].durationMin * 60 : null
+    initialStep?.durationMin != null ? initialStep.durationMin * 60 : null
   );
   const [timerRunning, setTimerRunning] = useState(false);
   const [trialStartedAt, setTrialStartedAt] = useState<string | null>(
@@ -157,7 +180,7 @@ export default function TrialRunnerClient({ id }: { id: string }) {
     if (idx >= 0 && idx < steps.length) {
       setCurrentStepIndex(idx);
       const nextStep = steps[idx];
-      if (nextStep?.durationMin) {
+      if (nextStep?.durationMin != null) {
         setTimerSecondsLeft(nextStep.durationMin * 60);
       } else {
         setTimerSecondsLeft(null);
@@ -168,21 +191,30 @@ export default function TrialRunnerClient({ id }: { id: string }) {
 
   // ─── Step countdown timer ───
   useEffect(() => {
-    if (timerRunning && timerSecondsLeft !== null && timerSecondsLeft > 0) {
-      timerRef.current = setInterval(() => {
-        setTimerSecondsLeft((prev) => {
-          if (prev === null || prev <= 1) {
-            setTimerRunning(false);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    if (!timerRunning) {
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+      };
     }
+
+    timerRef.current = setInterval(() => {
+      setTimerSecondsLeft((prev) => {
+        if (prev === null) {
+          setTimerRunning(false);
+          return null;
+        }
+        if (prev <= 1) {
+          setTimerRunning(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [timerRunning, timerSecondsLeft]);
+  }, [timerRunning]);
 
   // ─── Auto-advance when timer reaches zero ───
   useEffect(() => {
@@ -241,6 +273,7 @@ export default function TrialRunnerClient({ id }: { id: string }) {
 
   function handleCompleteTrial() {
     const now = new Date().toISOString();
+    setTimerRunning(false);
     setTrialStatus("completed");
     persistTrial({
       status: "completed",
@@ -275,7 +308,7 @@ export default function TrialRunnerClient({ id }: { id: string }) {
 
   function handleTimerReset() {
     setTimerRunning(false);
-    if (currentStep?.durationMin) {
+    if (currentStep?.durationMin != null) {
       setTimerSecondsLeft(currentStep.durationMin * 60);
     }
   }
@@ -441,7 +474,7 @@ export default function TrialRunnerClient({ id }: { id: string }) {
                       <div className="flex-1 min-w-0">
                         <CardTitle className="text-base flex items-center gap-2">
                           {step.name}
-                          {step.durationMin && (
+                          {step.durationMin != null && (
                             <Badge variant="secondary" className="text-xs">
                               <Timer className="h-3 w-3 mr-1" />
                               {step.durationMin} min

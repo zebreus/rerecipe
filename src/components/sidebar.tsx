@@ -125,7 +125,7 @@ export function Sidebar({
               >
                 <item.icon className="h-4 w-4" />
                 {item.label}
-                {item.label === "Trials" && hasActiveTrials && (
+                {item.href === "/trials" && hasActiveTrials && (
                   <span className="ml-auto h-2 w-2 rounded-full bg-green-500 animate-pulse" />
                 )}
               </Link>
