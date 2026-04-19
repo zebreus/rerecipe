@@ -15,6 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
@@ -45,6 +53,8 @@ export default function TrialDetailClient({ id }: { id: string }) {
     trial ? structuredClone(trial) : null
   );
   const [dirty, setDirty] = useState(false);
+  const [paramDialogOpen, setParamDialogOpen] = useState(false);
+  const [newParamName, setNewParamName] = useState("");
 
   if (!local) {
     return (
@@ -472,19 +482,72 @@ export default function TrialDetailClient({ id }: { id: string }) {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const key = prompt("Parameter name:");
-                  if (key) {
-                    update({
-                      actualParameters: {
-                        ...local!.actualParameters,
-                        [key]: "",
-                      },
-                    });
-                  }
+                  setNewParamName("");
+                  setParamDialogOpen(true);
                 }}
               >
                 <Plus className="h-3.5 w-3.5 mr-1" /> Add Parameter
               </Button>
+
+              <Dialog open={paramDialogOpen} onOpenChange={setParamDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Parameter</DialogTitle>
+                    <DialogDescription>
+                      Enter a name for the new parameter (e.g. &quot;Actual Temp&quot;, &quot;pH&quot;).
+                    </DialogDescription>
+                  </DialogHeader>
+                  {(() => {
+                    const trimmed = newParamName.trim();
+                    const isDuplicate =
+                      trimmed !== "" &&
+                      Object.keys(local!.actualParameters).some(
+                        (k) => k.toLowerCase() === trimmed.toLowerCase()
+                      );
+                    const canAdd = trimmed !== "" && !isDuplicate;
+
+                    const addParam = () => {
+                      if (!canAdd) return;
+                      update({
+                        actualParameters: {
+                          ...local!.actualParameters,
+                          [trimmed]: "",
+                        },
+                      });
+                      setParamDialogOpen(false);
+                    };
+
+                    return (
+                      <>
+                        <div className="space-y-2">
+                          <Label>Parameter Name</Label>
+                          <Input
+                            value={newParamName}
+                            onChange={(e) => setNewParamName(e.target.value)}
+                            placeholder="e.g. Actual Temperature"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") addParam();
+                            }}
+                          />
+                          {isDuplicate && (
+                            <p className="text-xs text-red-500 dark:text-red-400">
+                              A parameter named &quot;{trimmed}&quot; already exists.
+                            </p>
+                          )}
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setParamDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button onClick={addParam} disabled={!canAdd}>
+                            Add
+                          </Button>
+                        </DialogFooter>
+                      </>
+                    );
+                  })()}
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         </TabsContent>

@@ -1,7 +1,7 @@
 import ProtocolDetailClient from "./protocol-detail";
 
 export function generateStaticParams() {
-  return [{ id: "protocol-1" }];
+  return [{ id: "protocol-1" }, { id: "protocol-2" }];
 }
 
 export default async function ProtocolDetailPage({

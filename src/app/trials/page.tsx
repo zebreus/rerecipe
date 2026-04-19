@@ -121,7 +121,11 @@ export default function TrialsPage() {
         title="Trial Log"
         subtitle={`${data.trials.length} trial${data.trials.length !== 1 ? "s" : ""} recorded`}
       >
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={() => {
+          setNewFormulaId("");
+          setNewProtocolId("");
+          setDialogOpen(true);
+        }}>
           <Plus className="h-4 w-4 mr-1" />
           New Trial
         </Button>

@@ -34,10 +34,9 @@ export default function TargetPage() {
   const [target, setTarget] = useState<TargetProduct>(data.targetProduct);
   const [dirty, setDirty] = useState(false);
 
-  const [newAttr, setNewAttr] = useState<{
-    category: keyof TargetProduct["observedAttributes"];
-    value: string;
-  }>({ category: "texture", value: "" });
+  const [newAttrValues, setNewAttrValues] = useState<
+    Record<keyof TargetProduct["observedAttributes"], string>
+  >({ texture: "", flavor: "", color: "", packaging: "" });
 
   function handleSave() {
     updateTarget(target);
@@ -72,7 +71,7 @@ export default function TargetPage() {
     attrs[category] = [...attrs[category], value.trim()];
     setTarget({ ...target, observedAttributes: attrs });
     setDirty(true);
-    setNewAttr({ ...newAttr, value: "" });
+    setNewAttrValues(prev => ({ ...prev, [category]: "" }));
   }
 
   function removeAttribute(
@@ -291,18 +290,13 @@ export default function TargetPage() {
                     <Input
                       placeholder={`Add ${category}...`}
                       className="max-w-xs"
-                      value={
-                        newAttr.category === category ? newAttr.value : ""
-                      }
-                      onFocus={() =>
-                        setNewAttr({ category, value: newAttr.category === category ? newAttr.value : "" })
-                      }
+                      value={newAttrValues[category] || ""}
                       onChange={(e) =>
-                        setNewAttr({ category, value: e.target.value })
+                        setNewAttrValues(prev => ({ ...prev, [category]: e.target.value }))
                       }
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
-                          addAttribute(category, newAttr.value);
+                          addAttribute(category, newAttrValues[category] || "");
                         }
                       }}
                     />
@@ -310,7 +304,7 @@ export default function TargetPage() {
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        addAttribute(category, newAttr.value)
+                        addAttribute(category, newAttrValues[category] || "")
                       }
                     >
                       <Plus className="h-4 w-4" />
