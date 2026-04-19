@@ -28,7 +28,7 @@ import Link from "next/link";
 import { Plus, Trash2, ListChecks } from "lucide-react";
 import { generateId } from "@/lib/utils";
 import type { Protocol, ProtocolCategory } from "@/lib/types";
-import ProtocolDetailClient from "./[id]/protocol-detail";
+import ProtocolDetailClient from "./protocol-detail";
 
 const CATEGORIES: { value: ProtocolCategory; label: string }[] = [
   { value: "hot-fill", label: "Hot Fill" },

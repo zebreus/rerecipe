@@ -48,6 +48,8 @@ export function Sidebar({
   const { data, exportJSON, importJSON } = useStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const hasActiveTrials = data.trials.some((t) => t.status === "in-progress");
+
   function handleExport() {
     const json = exportJSON();
     const blob = new Blob([json], { type: "application/json" });
@@ -123,6 +125,9 @@ export function Sidebar({
               >
                 <item.icon className="h-4 w-4" />
                 {item.label}
+                {item.href === "/trials" && hasActiveTrials && (
+                  <span className="ml-auto h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                )}
               </Link>
             );
           })}

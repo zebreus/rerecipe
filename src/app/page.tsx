@@ -19,6 +19,7 @@ import {
   TrendingUp,
   AlertTriangle,
   HelpCircle,
+  Play,
 } from "lucide-react";
 import {
   calculateFormulaComponents,
@@ -44,6 +45,8 @@ import {
 export default function DashboardPage() {
   const { data } = useStore();
   const { targetProduct, ingredients, formulas, protocols, trials } = data;
+
+  const activeTrials = trials.filter((t) => t.status === "in-progress");
 
   const rankings = useMemo(
     () => rankTrials(trials, formulas, ingredients, targetProduct),
@@ -148,6 +151,43 @@ export default function DashboardPage() {
             <Link href="/target" className="ml-auto">
               <Button size="sm">Set Target</Button>
             </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTrials.length > 0 && (
+        <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Play className="h-4 w-4 text-green-600" />
+              Active Trials
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {activeTrials.map((t) => {
+              const formula = formulas.find((f) => f.id === t.formulaId);
+              const protocol = protocols.find((p) => p.id === t.protocolId);
+              return (
+                <div key={t.id} className="flex items-center justify-between">
+                  <div className="text-sm">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                      Trial #{t.runNumber}
+                    </span>
+                    {formula && (
+                      <span className="text-gray-500 dark:text-gray-400"> — {formula.name}</span>
+                    )}
+                    {protocol && (
+                      <span className="text-gray-400 dark:text-gray-500 text-xs"> ({protocol.name})</span>
+                    )}
+                  </div>
+                  <Link href={`/trials?id=${t.id}&mode=run`}>
+                    <Button size="sm" variant="outline" className="gap-1">
+                      <Play className="h-3 w-3" /> Continue Run
+                    </Button>
+                  </Link>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       )}
@@ -278,8 +318,8 @@ export default function DashboardPage() {
             </Link>
             <Link href="/trials" className="block">
               <Button variant="outline" className="w-full justify-start gap-2">
-                <TestTube className="h-4 w-4" />
-                Log Trial
+                <Play className="h-4 w-4" />
+                Run Trial
               </Button>
             </Link>
             <Link href="/analysis" className="block">

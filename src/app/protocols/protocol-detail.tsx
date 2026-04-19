@@ -34,6 +34,7 @@ import {
   ChevronDown,
   TestTube,
   AlertTriangle,
+  Play,
 } from "lucide-react";
 import type { Protocol, ProtocolStep, Trial } from "@/lib/types";
 import { generateId, statusColor } from "@/lib/utils";
@@ -102,7 +103,7 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
     setConfirmSaveOpen(false);
   }
 
-  function handleCreateTrial() {
+  function createTrialAndNavigate(mode?: "run") {
     if (!newTrialFormulaId || !local) return;
     const now = new Date().toISOString();
     const runNumber = data.trials.filter((t) => t.formulaId === newTrialFormulaId).length + 1;
@@ -132,7 +133,15 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
     addTrial(t);
     setTrialDialogOpen(false);
     setNewTrialFormulaId("");
-    router.push(`/trials?id=${t.id}`);
+    router.push(mode === "run" ? `/trials?id=${t.id}&mode=run` : `/trials?id=${t.id}`);
+  }
+
+  function handleCreateTrial() {
+    createTrialAndNavigate();
+  }
+
+  function handleCreateAndRunTrial() {
+    createTrialAndNavigate("run");
   }
 
   function update(partial: Partial<Protocol>) {
@@ -677,6 +686,9 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
             </Button>
             <Button onClick={handleCreateTrial} disabled={!newTrialFormulaId}>
               Create Trial
+            </Button>
+            <Button onClick={handleCreateAndRunTrial} disabled={!newTrialFormulaId}>
+              <Play className="h-4 w-4 mr-1" /> Create &amp; Run
             </Button>
           </DialogFooter>
         </DialogContent>

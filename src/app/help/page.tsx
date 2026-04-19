@@ -60,8 +60,9 @@ const STEPS = [
     icon: TestTube,
     title: "5. Run and Log Trials",
     description:
-      "Execute experiments by combining a formula with a protocol. Record observations, measurements, and score each quality dimension.",
+      "Execute experiments by combining a formula with a protocol. Use the interactive guided runner with step-by-step timers and live observation logging, or record results manually. Score each quality dimension to track progress.",
     tips: [
+      "Use the ▶ Run button to launch the interactive trial runner with timers",
       "Change only one variable at a time between trials",
       "Record actual parameters, not just planned ones",
       "Use the scoring rubric consistently across trials",

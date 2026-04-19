@@ -42,7 +42,7 @@ import {
   COMPONENT_KEYS,
   COMPONENT_LABELS,
 } from "@/lib/types";
-import FormulaDetailClient from "./[id]/formula-detail";
+import FormulaDetailClient from "./formula-detail";
 import {
   BarChart,
   Bar,

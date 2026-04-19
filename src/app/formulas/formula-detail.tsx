@@ -25,7 +25,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, Save, Lock, Unlock, Printer, TestTube, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Lock, Unlock, Printer, TestTube, AlertTriangle, Play } from "lucide-react";
 import type { Formula, FormulaLine, Trial } from "@/lib/types";
 import {
   COMPONENT_KEYS,
@@ -101,7 +101,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     setConfirmSaveOpen(false);
   }
 
-  function handleCreateTrial() {
+  function createTrialAndNavigate(mode?: "run") {
     if (!newTrialProtocolId || !local) return;
     const now = new Date().toISOString();
     const runNumber = data.trials.filter((t) => t.formulaId === local.id).length + 1;
@@ -131,7 +131,15 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     addTrial(t);
     setTrialDialogOpen(false);
     setNewTrialProtocolId("");
-    router.push(`/trials?id=${t.id}`);
+    router.push(mode === "run" ? `/trials?id=${t.id}&mode=run` : `/trials?id=${t.id}`);
+  }
+
+  function handleCreateTrial() {
+    createTrialAndNavigate();
+  }
+
+  function handleCreateAndRunTrial() {
+    createTrialAndNavigate("run");
   }
 
   function update(partial: Partial<Formula>) {
@@ -926,6 +934,9 @@ export default function FormulaDetailClient({ id }: { id: string }) {
             </Button>
             <Button onClick={handleCreateTrial} disabled={!newTrialProtocolId}>
               Create Trial
+            </Button>
+            <Button onClick={handleCreateAndRunTrial} disabled={!newTrialProtocolId}>
+              <Play className="h-4 w-4 mr-1" /> Create &amp; Run
             </Button>
           </DialogFooter>
         </DialogContent>

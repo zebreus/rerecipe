@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from "react";
 import { useStore } from "@/lib/store";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,14 +23,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
-import { Plus, Trash2, TestTube, Copy, Search } from "lucide-react";
+import { Plus, Trash2, TestTube, Copy, Search, Play } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { generateId, statusColor, formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import type { Trial } from "@/lib/types";
 import { calculateSimilarityScore } from "@/lib/solver";
-import TrialDetailClient from "./[id]/trial-detail";
+import TrialDetailClient from "./trial-detail";
+import TrialRunnerClient from "./trial-runner";
 
 const STATUS_OPTIONS = ["all", "planned", "in-progress", "completed", "failed", "abandoned"] as const;
 
@@ -45,6 +46,11 @@ export default function TrialsPage() {
 function TrialsRouter() {
   const searchParams = useSearchParams();
   const detailId = searchParams.get("id");
+  const mode = searchParams.get("mode");
+
+  if (detailId && mode === "run") {
+    return <TrialRunnerClient id={detailId} />;
+  }
 
   if (detailId) {
     return <TrialDetailClient id={detailId} />;
@@ -55,6 +61,7 @@ function TrialsRouter() {
 
 function TrialsListView() {
   const { data, addTrial, deleteTrial } = useStore();
+  const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newFormulaId, setNewFormulaId] = useState("");
   const [newProtocolId, setNewProtocolId] = useState("");
@@ -62,8 +69,7 @@ function TrialsListView() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [protocolFilter, setProtocolFilter] = useState<string>("all");
 
-  function handleCreate() {
-    if (!newFormulaId || !newProtocolId) return;
+  function createTrial(): Trial {
     const now = new Date().toISOString();
     const runNumber =
       data.trials.filter((t) => t.formulaId === newFormulaId).length + 1;
@@ -91,7 +97,20 @@ function TrialsListView() {
       updatedAt: now,
     };
     addTrial(t);
+    return t;
+  }
+
+  function handleCreate() {
+    if (!newFormulaId || !newProtocolId) return;
+    createTrial();
     setDialogOpen(false);
+  }
+
+  function handleCreateAndRun() {
+    if (!newFormulaId || !newProtocolId) return;
+    const t = createTrial();
+    setDialogOpen(false);
+    router.push(`/trials?id=${t.id}&mode=run`);
   }
 
   function handleDelete(id: string) {
@@ -250,6 +269,19 @@ function TrialsListView() {
                         </p>
                         <p className="text-[10px] text-gray-400 dark:text-gray-500">Score</p>
                       </div>
+                      {protocol && (
+                        <Link href={`/trials?id=${trial.id}&mode=run`}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-green-600 dark:text-green-400"
+                            title="Run Trial"
+                            aria-label={`Run Trial #${trial.runNumber}`}
+                          >
+                            <Play className="h-3.5 w-3.5" />
+                          </Button>
+                        </Link>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -356,6 +388,9 @@ function TrialsListView() {
               Cancel
             </Button>
             <Button onClick={handleCreate} disabled={!newFormulaId || !newProtocolId}>Create Trial</Button>
+            <Button onClick={handleCreateAndRun} disabled={!newFormulaId || !newProtocolId}>
+              <Play className="h-4 w-4 mr-1" /> Create &amp; Run
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
