@@ -138,7 +138,8 @@ export function compositionSimilarity(
   let totalWeight = 0;
   for (const key of COMPONENT_KEYS) {
     const diff = Math.abs(a[key] - b[key]);
-    // Weight by magnitude so large components (water 62%) matter more than trace ones (salt 0.15%)
+    // Use 0.1 as floor to prevent division by zero for trace components (e.g. salt at 0%)
+    // while still giving them low weight relative to major components
     const weight = Math.max(a[key], b[key], 0.1);
     weightedError += diff * weight;
     totalWeight += weight;

@@ -52,3 +52,25 @@ export function statusColor(
       return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
   }
 }
+
+/** Generate a timestamped export filename from a project name. */
+export function exportFilename(projectName: string): string {
+  const safeName = projectName.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+  return `${safeName}-${timestamp}.json`;
+}
+
+/** Validate imported JSON and return a descriptive error or null if valid. */
+export function describeImportError(text: string): string | null {
+  try {
+    const parsed = JSON.parse(text);
+    const requiredFields = ["project", "ingredients", "formulas", "protocols", "trials", "targetProduct"];
+    const missing = requiredFields.filter((f) => !parsed[f]);
+    if (missing.length > 0) {
+      return `Import failed. Missing required field(s): ${missing.map((f) => `'${f}'`).join(", ")}.`;
+    }
+    return null;
+  } catch {
+    return "Import failed. The input is not valid JSON.";
+  }
+}
