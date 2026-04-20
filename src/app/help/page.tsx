@@ -89,7 +89,7 @@ export default function HelpPage() {
           Getting Started
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Learn how to use the Recipe Reverse Engineering Suite step by step.
+          Learn how to use the RErecipe Suite step by step.
         </p>
       </div>
 

@@ -1,4 +1,4 @@
-// ─── Core Data Types for Recipe Reverse Engineering Suite ───
+// ─── Core Data Types for RErecipe Suite ───
 
 export interface Project {
   id: string;

@@ -28,7 +28,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
               <FlaskConical className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               <span className="font-bold text-sm text-gray-900 dark:text-gray-100">
-                Recipe RE
+                RErecipe
               </span>
             </div>
             <main className="flex-1 overflow-y-auto bg-white dark:bg-gray-950">

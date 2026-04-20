@@ -17,7 +17,7 @@ export function createDefaultProjectData(): ProjectData {
   return {
     project: {
       id: "single-project",
-      name: "Recipe Reverse Engineering",
+      name: "RErecipe",
       createdAt: now(),
       updatedAt: now(),
     },

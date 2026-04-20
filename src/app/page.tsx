@@ -105,7 +105,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title={data.project.name}
-        subtitle="Recipe Reverse Engineering Dashboard"
+        subtitle="RErecipe Dashboard"
       />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

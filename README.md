@@ -1,4 +1,4 @@
-# Recipe RE – Reverse Engineering Suite
+# RErecipe – Reverse Engineering Suite
 
 A web-based Next.js application for reverse-engineering recipes from finished products, then running and tracking experimental protocols.
 
