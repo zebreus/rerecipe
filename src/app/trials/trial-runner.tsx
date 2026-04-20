@@ -162,6 +162,7 @@ export default function TrialRunnerClient({ id }: { id: string }) {
   const observationInputRef = useRef<HTMLInputElement>(null);
   const observationLogRef = useRef<HTMLDivElement>(null);
   const stepRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentStep: ProtocolStep | undefined = steps[currentStepIndex];
 
@@ -188,10 +189,15 @@ export default function TrialRunnerClient({ id }: { id: string }) {
         setTimerSecondsLeft(null);
       }
       setTimerRunning(false);
+      // Cancel any pending scroll before scheduling a new one
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
       // Scroll the target step into view after DOM update
-      setTimeout(() => {
+      scrollTimeoutRef.current = setTimeout(() => {
         const el = stepRefs.current.get(idx);
         el?.scrollIntoView({ behavior: "smooth", block: "start" });
+        scrollTimeoutRef.current = null;
       }, SCROLL_INTO_VIEW_DELAY_MS);
     }
   }, [steps]);
@@ -265,6 +271,13 @@ export default function TrialRunnerClient({ id }: { id: string }) {
         observationLogRef.current.scrollHeight;
     }
   }, [observations.length]);
+
+  // ─── Cleanup pending scroll timeout on unmount ───
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    };
+  }, []);
 
   // ─── Handlers ───
   function handleStartTrial() {
@@ -442,7 +455,11 @@ export default function TrialRunnerClient({ id }: { id: string }) {
               <div
                 key={step.id}
                 ref={(el) => {
-                  if (el) stepRefs.current.set(idx, el);
+                  if (el) {
+                    stepRefs.current.set(idx, el);
+                  } else {
+                    stepRefs.current.delete(idx);
+                  }
                 }}
                 className={cn(
                   "relative",
@@ -801,6 +818,7 @@ export default function TrialRunnerClient({ id }: { id: string }) {
             className="flex gap-2 items-center"
           >
             <Input
+              ref={observationInputRef}
               value={observationText}
               onChange={(e) => setObservationText(e.target.value)}
               placeholder="Log an observation..."
