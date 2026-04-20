@@ -110,6 +110,7 @@ function agitationColor(level: string): string {
 }
 
 const AUTO_ADVANCE_DELAY_MS = 1500;
+const SCROLL_INTO_VIEW_DELAY_MS = 100;
 const DEFAULT_OBSERVATION_CATEGORY = "General";
 
 export default function TrialRunnerClient({ id }: { id: string }) {
@@ -187,11 +188,11 @@ export default function TrialRunnerClient({ id }: { id: string }) {
         setTimerSecondsLeft(null);
       }
       setTimerRunning(false);
-      // Scroll the target step into view
+      // Scroll the target step into view after DOM update
       setTimeout(() => {
         const el = stepRefs.current.get(idx);
         el?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 100);
+      }, SCROLL_INTO_VIEW_DELAY_MS);
     }
   }, [steps]);
 
