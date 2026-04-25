@@ -25,7 +25,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, Save, Lock, Unlock, Printer, TestTube, AlertTriangle, Play } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Save, Lock, Unlock, Printer, TestTube, AlertTriangle, Play, ArrowUp, ArrowDown } from "lucide-react";
 import type { Formula, FormulaLine, Trial } from "@/lib/types";
 import { nutritionColor } from "@/lib/types";
 import {
@@ -35,6 +35,7 @@ import {
   ingredientContributions,
   sensitivityAnalysis,
   checkCompliance,
+  checkIngredientOrderCompliance,
   totalFormulaMassG,
 } from "@/lib/solver";
 import { Badge } from "@/components/ui/badge";
@@ -174,7 +175,16 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     });
   }
 
+  function moveLine(index: number, direction: "up" | "down") {
+    const lines = [...local!.ingredientLines];
+    const swapIdx = direction === "up" ? index - 1 : index + 1;
+    if (swapIdx < 0 || swapIdx >= lines.length) return;
+    [lines[index], lines[swapIdx]] = [lines[swapIdx], lines[index]];
+    update({ ingredientLines: lines });
+  }
+
   const trackedNutrients = data.targetProduct.targetNutrition;
+  const targetIngredients = data.targetProduct.targetIngredients ?? [];
   const calc = calculateFormulaNutrition(
     local.ingredientLines,
     ingredients,
@@ -186,6 +196,13 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     local.ingredientLines,
     ingredients,
     trackedNutrients
+  );
+
+  // Ingredient order compliance
+  const ingredientOrderCompliance = checkIngredientOrderCompliance(
+    local.ingredientLines,
+    targetIngredients,
+    ingredients
   );
 
   // Heatmap data — one row per ingredient line, with nutrient names as series.
@@ -264,6 +281,37 @@ export default function FormulaDetailClient({ id }: { id: string }) {
         </div>
       )}
 
+      {/* Warning banner for ingredient order / percentage deviations */}
+      {ingredientOrderCompliance.status === "warning" && (
+        <div className="rounded-md px-4 py-3 text-sm bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800">
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span className="font-medium">Deviates from target ingredient composition</span>
+          </div>
+          <ul className="ml-6 mt-1 space-y-0.5 list-disc text-xs">
+            {ingredientOrderCompliance.issues.map((issue, i) => (
+              <li key={i}>
+                {issue.kind === "missing" && (
+                  <span>
+                    <strong>{issue.ingredientName}</strong> is in the target ingredient list but not added to this formula.
+                  </span>
+                )}
+                {issue.kind === "pct-deviation" && (
+                  <span>
+                    <strong>{issue.ingredientName}</strong>: target {issue.targetPct?.toFixed(1)}% vs formula {issue.formulaPct?.toFixed(1)}%.
+                  </span>
+                )}
+                {issue.kind === "order-mismatch" && (
+                  <span>
+                    <strong>{issue.ingredientName}</strong> is at rank #{issue.actualRank} by mass but expected at rank #{issue.expectedRank} in the target order.
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <Tabs defaultValue="builder">
         <TabsList>
           <TabsTrigger value="builder">Formula Builder</TabsTrigger>
@@ -298,6 +346,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                             <th className="pb-2 font-medium w-28">Mass (g)</th>
                             <th className="pb-2 font-medium w-24">Cost ($)</th>
                             <th className="pb-2 font-medium w-16">Lock</th>
+                            <th className="pb-2 font-medium w-16">Order</th>
                             <th className="pb-2 font-medium w-12"></th>
                           </tr>
                         </thead>
@@ -375,6 +424,30 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                   </Button>
                                 </td>
                                 <td className="py-2">
+                                  <div className="flex gap-0.5">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      aria-label="Move up"
+                                      disabled={idx === 0}
+                                      onClick={() => moveLine(idx, "up")}
+                                    >
+                                      <ArrowUp className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      aria-label="Move down"
+                                      disabled={idx === local.ingredientLines.length - 1}
+                                      onClick={() => moveLine(idx, "down")}
+                                    >
+                                      <ArrowDown className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </td>
+                                <td className="py-2">
                                   <Button
                                     variant="ghost"
                                     size="icon"
@@ -401,6 +474,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                 return sum + (ing ? (l.massG * ing.costPerKg) / 1000 : 0);
                               }, 0).toFixed(2)}
                             </td>
+                            <td></td>
                             <td></td>
                             <td></td>
                           </tr>

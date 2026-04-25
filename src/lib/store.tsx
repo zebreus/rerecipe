@@ -37,6 +37,10 @@ function normalizeProjectData(
 ): ProjectData {
   return {
     ...data,
+    targetProduct: {
+      ...data.targetProduct,
+      targetIngredients: data.targetProduct.targetIngredients ?? [],
+    },
     trials: (data.trials || []).map((t) => ({
       ...t,
       stepLogs: t.stepLogs ?? [],

@@ -19,6 +19,7 @@ import {
 import {
   type TargetProduct,
   type NutritionalValue,
+  type TargetIngredient,
   COMMON_NUTRITION_OPTIONS,
   COMMON_NUTRITION_UNITS,
   nutritionColor,
@@ -33,7 +34,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { Save, Plus, X } from "lucide-react";
+import { Save, Plus, X, ArrowUp, ArrowDown, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 
 export default function TargetPage() {
@@ -48,6 +49,9 @@ export default function TargetPage() {
   // Add-nutrient form state
   const [newNutrName, setNewNutrName] = useState("");
   const [newNutrUnit, setNewNutrUnit] = useState("g");
+
+  // Ingredient order tab: ingredient to add
+  const [newIngId, setNewIngId] = useState("");
 
   function handleSave() {
     updateTarget(target);
@@ -99,6 +103,58 @@ export default function TargetPage() {
     setDirty(true);
   }
 
+  // ─── Target Ingredient Order ───
+
+  function addTargetIngredient(ingredientId: string) {
+    if (!ingredientId) return;
+    if (target.targetIngredients.some((ti) => ti.ingredientId === ingredientId))
+      return;
+    setTarget({
+      ...target,
+      targetIngredients: [
+        ...target.targetIngredients,
+        { ingredientId },
+      ],
+    });
+    setDirty(true);
+    setNewIngId("");
+  }
+
+  function removeTargetIngredient(ingredientId: string) {
+    setTarget({
+      ...target,
+      targetIngredients: target.targetIngredients.filter(
+        (ti) => ti.ingredientId !== ingredientId
+      ),
+    });
+    setDirty(true);
+  }
+
+  function moveTargetIngredient(index: number, direction: "up" | "down") {
+    const list = [...target.targetIngredients];
+    const swapIdx = direction === "up" ? index - 1 : index + 1;
+    if (swapIdx < 0 || swapIdx >= list.length) return;
+    [list[index], list[swapIdx]] = [list[swapIdx], list[index]];
+    setTarget({ ...target, targetIngredients: list });
+    setDirty(true);
+  }
+
+  function updateTargetIngredientPct(
+    ingredientId: string,
+    pct: string
+  ) {
+    const val = pct.trim() === "" ? undefined : Math.max(0, Math.min(100, Number(pct)));
+    setTarget({
+      ...target,
+      targetIngredients: target.targetIngredients.map((ti) =>
+        ti.ingredientId === ingredientId
+          ? ({ ...ti, targetPct: val } as TargetIngredient)
+          : ti
+      ),
+    });
+    setDirty(true);
+  }
+
   function addAttribute(
     category: keyof TargetProduct["observedAttributes"],
     value: string
@@ -135,6 +191,21 @@ export default function TargetPage() {
     color: nutritionColor(n.name),
   }));
 
+  // Ingredients not yet added to the target ingredient order list
+  const availableIngredients = data.ingredients.filter(
+    (ing) =>
+      !target.targetIngredients.some((ti) => ti.ingredientId === ing.id)
+  );
+
+  // Total of set target percentages
+  const totalTargetPct = target.targetIngredients.reduce(
+    (sum, ti) => sum + (ti.targetPct ?? 0),
+    0
+  );
+  const hasPctValues = target.targetIngredients.some(
+    (ti) => ti.targetPct !== undefined
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -151,6 +222,7 @@ export default function TargetPage() {
         <TabsList>
           <TabsTrigger value="basics">Basic Info</TabsTrigger>
           <TabsTrigger value="nutrition">Nutritional Values</TabsTrigger>
+          <TabsTrigger value="ingredients">Ingredient Order</TabsTrigger>
           <TabsTrigger value="attributes">Observed Attributes</TabsTrigger>
         </TabsList>
 
@@ -350,6 +422,195 @@ export default function TargetPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="ingredients">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Expected Ingredient Order</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                List ingredients in the order they appear on the product label (highest mass
+                percentage first). Optionally set target mass percentages. This list is used
+                to pre-populate new formulas and to warn you when a formula deviates from the
+                expected composition.
+              </p>
+
+              {/* Warning: percentages don&apos;t sum to 100 */}
+              {hasPctValues && Math.abs(totalTargetPct - 100) > 1 && (
+                <div className="flex items-center gap-2 rounded-md px-3 py-2 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Target percentages sum to {totalTargetPct.toFixed(1)}% (expected ~100%).
+                  </span>
+                </div>
+              )}
+
+              {target.targetIngredients.length === 0 ? (
+                <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">
+                  No target ingredients yet. Add them from your ingredient library below.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-gray-500 dark:text-gray-400">
+                        <th className="pb-2 font-medium w-8">#</th>
+                        <th className="pb-2 font-medium">Ingredient</th>
+                        <th className="pb-2 font-medium w-36">Target % (mass)</th>
+                        <th className="pb-2 font-medium w-20">Order</th>
+                        <th className="pb-2 font-medium w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {target.targetIngredients.map((ti, idx) => {
+                        const ing = data.ingredients.find(
+                          (i) => i.id === ti.ingredientId
+                        );
+                        return (
+                          <tr key={ti.ingredientId} className="border-b last:border-0">
+                            <td className="py-2 text-gray-400 dark:text-gray-500 text-xs">
+                              {idx + 1}
+                            </td>
+                            <td className="py-2 font-medium text-gray-900 dark:text-gray-100">
+                              {ing?.name ?? (
+                                <span className="text-red-500 dark:text-red-400">
+                                  Unknown ({ti.ingredientId})
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2">
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max="100"
+                                  className="h-7 w-24 text-xs"
+                                  placeholder="—"
+                                  value={ti.targetPct ?? ""}
+                                  onChange={(e) =>
+                                    updateTargetIngredientPct(
+                                      ti.ingredientId,
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                                <span className="text-xs text-gray-400 dark:text-gray-500">%</span>
+                              </div>
+                            </td>
+                            <td className="py-2">
+                              <div className="flex gap-0.5">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  aria-label="Move up"
+                                  disabled={idx === 0}
+                                  onClick={() =>
+                                    moveTargetIngredient(idx, "up")
+                                  }
+                                >
+                                  <ArrowUp className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  aria-label="Move down"
+                                  disabled={
+                                    idx === target.targetIngredients.length - 1
+                                  }
+                                  onClick={() =>
+                                    moveTargetIngredient(idx, "down")
+                                  }
+                                >
+                                  <ArrowDown className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </td>
+                            <td className="py-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-red-500 dark:text-red-400"
+                                aria-label={`Remove ${ing?.name ?? ti.ingredientId}`}
+                                onClick={() =>
+                                  removeTargetIngredient(ti.ingredientId)
+                                }
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    {hasPctValues && (
+                      <tfoot>
+                        <tr className="border-t">
+                          <td></td>
+                          <td className="py-2 text-xs text-gray-500 dark:text-gray-400">
+                            Total
+                          </td>
+                          <td className="py-2 text-xs font-medium tabular-nums">
+                            {totalTargetPct.toFixed(1)}%
+                          </td>
+                          <td></td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              )}
+
+              {/* Add ingredient */}
+              {availableIngredients.length > 0 && (
+                <div className="border-t pt-3 space-y-2">
+                  <Label className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    Add ingredient
+                  </Label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={newIngId}
+                      onValueChange={setNewIngId}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select ingredient…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableIngredients.map((ing) => (
+                          <SelectItem key={ing.id} value={ing.id}>
+                            {ing.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!newIngId}
+                      onClick={() => addTargetIngredient(newIngId)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {data.ingredients.length === 0 && (
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  No ingredients in library yet.{" "}
+                  <a href="/ingredients" className="underline">
+                    Add ingredients
+                  </a>{" "}
+                  first.
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="attributes">

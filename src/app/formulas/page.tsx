@@ -77,18 +77,45 @@ function FormulasListView() {
   function handleCreate() {
     if (!newName.trim()) return;
     const now = new Date().toISOString();
-    const f: Formula = {
+
+    // Pre-populate ingredient lines from the target ingredient order.
+    // For ingredients with a targetPct, derive the mass from that percentage.
+    // For ingredients without a targetPct, distribute remaining mass evenly.
+    const targetIngredients = data.targetProduct.targetIngredients ?? [];
+    const targetMassG = data.targetProduct.targetMassG;
+
+    let ingredientLines: import("@/lib/types").FormulaLine[] = [];
+    if (targetIngredients.length > 0) {
+      const withPct = targetIngredients.filter((ti) => ti.targetPct !== undefined);
+      const withoutPct = targetIngredients.filter((ti) => ti.targetPct === undefined);
+      const usedPct = withPct.reduce((sum, ti) => sum + (ti.targetPct ?? 0), 0);
+      const remainingPct = Math.max(0, 100 - usedPct);
+      const perUndefinedPct =
+        withoutPct.length > 0 ? remainingPct / withoutPct.length : 0;
+
+      ingredientLines = targetIngredients.map((ti) => {
+        const pct = ti.targetPct ?? perUndefinedPct;
+        const massG = Math.max(0.1, Math.round(((pct / 100) * targetMassG) * 10) / 10);
+        return {
+          ingredientId: ti.ingredientId,
+          massG,
+          locked: false,
+        };
+      });
+    }
+
+    const f: import("@/lib/types").Formula = {
       id: generateId(),
       name: newName.trim(),
       description: newDesc.trim(),
       version: 1,
-      targetMassG: data.targetProduct.targetMassG,
-      ingredientLines: [],
+      targetMassG,
+      ingredientLines,
       calculatedNutrition: {},
       totalMassG: 0,
       massBalance: {
         totalInputG: 0,
-        totalOutputG: data.targetProduct.targetMassG,
+        totalOutputG: targetMassG,
         lossG: 0,
         lossPct: 0,
         waterAdjustmentG: 0,
@@ -397,8 +424,10 @@ function FormulasListView() {
           <DialogHeader>
             <DialogTitle>New Formula</DialogTitle>
             <DialogDescription>
-              Create a new candidate formula. You can add ingredients in the
-              detail view.
+              Create a new candidate formula.
+              {(data.targetProduct.targetIngredients ?? []).length > 0
+                ? ` It will be pre-populated with the ${data.targetProduct.targetIngredients.length} ingredient${data.targetProduct.targetIngredients.length !== 1 ? "s" : ""} from your target ingredient order.`
+                : " You can add ingredients in the detail view."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
