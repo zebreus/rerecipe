@@ -289,25 +289,35 @@ export default function FormulaDetailClient({ id }: { id: string }) {
             <span className="font-medium">Deviates from target ingredient composition</span>
           </div>
           <ul className="ml-6 mt-1 space-y-0.5 list-disc text-xs">
-            {ingredientOrderCompliance.issues.map((issue, i) => (
-              <li key={i}>
-                {issue.kind === "missing" && (
-                  <span>
-                    <strong>{issue.ingredientName}</strong> is in the target ingredient list but not added to this formula.
-                  </span>
-                )}
-                {issue.kind === "pct-deviation" && (
-                  <span>
-                    <strong>{issue.ingredientName}</strong>: target {issue.targetPct?.toFixed(1)}% vs formula {issue.formulaPct?.toFixed(1)}%.
-                  </span>
-                )}
-                {issue.kind === "order-mismatch" && (
-                  <span>
-                    <strong>{issue.ingredientName}</strong> is at rank #{issue.actualRank} by mass but expected at rank #{issue.expectedRank} in the target order.
-                  </span>
-                )}
-              </li>
-            ))}
+            {ingredientOrderCompliance.issues.map((issue) => {
+              const issueKey = [
+                issue.kind,
+                issue.ingredientId,
+                issue.kind === "order-mismatch" ? issue.expectedRank : undefined,
+                issue.kind === "order-mismatch" ? issue.actualRank : undefined,
+                issue.kind === "pct-deviation" ? issue.targetPct : undefined,
+                issue.kind === "pct-deviation" ? issue.formulaPct : undefined,
+              ].join(":");
+              return (
+                <li key={issueKey}>
+                  {issue.kind === "missing" && (
+                    <span>
+                      <strong>{issue.ingredientName}</strong> is in the target ingredient list but not added to this formula.
+                    </span>
+                  )}
+                  {issue.kind === "pct-deviation" && (
+                    <span>
+                      <strong>{issue.ingredientName}</strong>: target {issue.targetPct?.toFixed(1)}% vs formula {issue.formulaPct?.toFixed(1)}%.
+                    </span>
+                  )}
+                  {issue.kind === "order-mismatch" && (
+                    <span>
+                      <strong>{issue.ingredientName}</strong> is at rank #{issue.actualRank} by mass but expected at rank #{issue.expectedRank} in the target order.
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

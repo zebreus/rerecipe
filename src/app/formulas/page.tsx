@@ -79,13 +79,12 @@ function FormulasListView() {
     const now = new Date().toISOString();
 
     // Pre-populate ingredient lines from the target ingredient order.
-    // For ingredients with a targetPct, derive the mass from that percentage.
-    // For ingredients without a targetPct, distribute remaining mass evenly.
+    // Skip when targetMassG is zero or negative.
     const targetIngredients = data.targetProduct.targetIngredients ?? [];
     const targetMassG = data.targetProduct.targetMassG;
 
     let ingredientLines: FormulaLine[] = [];
-    if (targetIngredients.length > 0) {
+    if (targetIngredients.length > 0 && targetMassG > 0) {
       const withPct = targetIngredients.filter((ti) => ti.targetPct !== undefined);
       const withoutPct = targetIngredients.filter((ti) => ti.targetPct === undefined);
       const usedPct = withPct.reduce((sum, ti) => sum + (ti.targetPct ?? 0), 0);
@@ -93,15 +92,23 @@ function FormulasListView() {
       const perUndefinedPct =
         withoutPct.length > 0 ? remainingPct / withoutPct.length : 0;
 
-      ingredientLines = targetIngredients.map((ti) => {
+      // Compute raw masses from percentages (no floor clamp).
+      const rawLines = targetIngredients.map((ti) => {
         const pct = ti.targetPct ?? perUndefinedPct;
-        const massG = Math.max(0.1, Math.round(((pct / 100) * targetMassG) * 10) / 10);
         return {
           ingredientId: ti.ingredientId,
-          massG,
+          massG: (pct / 100) * targetMassG,
           locked: false,
         };
       });
+
+      // Scale so the total exactly equals targetMassG.
+      const rawTotal = rawLines.reduce((s, l) => s + l.massG, 0);
+      const scale = rawTotal > 0 ? targetMassG / rawTotal : 1;
+      ingredientLines = rawLines.map((l) => ({
+        ...l,
+        massG: Math.round(l.massG * scale * 10) / 10,
+      }));
     }
 
     const f: Formula = {

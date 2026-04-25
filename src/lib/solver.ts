@@ -254,7 +254,7 @@ export function checkCompliance(
 // Warnings are emitted when:
 //  - A target ingredient is missing from the formula entirely.
 //  - An ingredient has a targetPct and the formula's actual mass% deviates
-//    by more than WARN_PCT_DIFF percentage points.
+//    by more than PCT_WARN_DIFF percentage points.
 //  - The ingredient ranking by mass% in the formula does not match the
 //    expected target order.
 

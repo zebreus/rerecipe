@@ -143,7 +143,8 @@ export default function TargetPage() {
     ingredientId: string,
     pct: string
   ) {
-    const val = pct.trim() === "" ? undefined : Math.max(0, Math.min(100, Number(pct)));
+    const num = Number(pct);
+    const val = pct.trim() === "" || !isFinite(num) ? undefined : Math.max(0, Math.min(100, num));
     setTarget({
       ...target,
       targetIngredients: target.targetIngredients.map((ti) =>
