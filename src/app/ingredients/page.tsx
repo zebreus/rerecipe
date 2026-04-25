@@ -30,12 +30,12 @@ import {
   COMPONENT_COLORS,
   INGREDIENT_CATEGORIES,
   EMPTY_COMPOSITION,
-  DEFAULT_PROJECT_SETTINGS,
 } from "@/lib/types";
 import { generateId } from "@/lib/utils";
 import { Plus, Pencil, Trash2, Search, Leaf, Zap, HelpCircle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import {
   BarChart,
   Bar,
@@ -52,10 +52,37 @@ import { COMMON_INGREDIENTS } from "@/lib/common-ingredients";
 const CONFIDENCE_TOOLTIP =
   "How certain we are about the correctness of this ingredient's composition data. A higher value means the data is from a reliable source and has been verified.";
 
+function ConfidenceHelpButton() {
+  return (
+    <TooltipPrimitive.Provider delayDuration={150}>
+      <TooltipPrimitive.Root>
+        <TooltipPrimitive.Trigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center rounded-sm cursor-help text-gray-400 dark:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-950 dark:focus-visible:ring-gray-300 focus-visible:ring-offset-2 ring-offset-white dark:ring-offset-gray-900"
+            aria-label="What the confidence value means"
+          >
+            <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </TooltipPrimitive.Trigger>
+        <TooltipPrimitive.Portal>
+          <TooltipPrimitive.Content
+            side="top"
+            className="z-50 max-w-xs rounded-md bg-gray-950 px-3 py-2 text-xs text-gray-50 shadow-md dark:bg-gray-50 dark:text-gray-950"
+          >
+            {CONFIDENCE_TOOLTIP}
+            <TooltipPrimitive.Arrow className="fill-gray-950 dark:fill-gray-50" />
+          </TooltipPrimitive.Content>
+        </TooltipPrimitive.Portal>
+      </TooltipPrimitive.Root>
+    </TooltipPrimitive.Provider>
+  );
+}
+
 export default function IngredientsPage() {
   const { data, addIngredient, updateIngredient, deleteIngredient } =
     useStore();
-  const settings = data.settings ?? DEFAULT_PROJECT_SETTINGS;
+  const settings = data.settings;
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -330,12 +357,7 @@ export default function IngredientsPage() {
                   <p className="flex items-center gap-1">
                     <span className="text-gray-500 dark:text-gray-400">Confidence:</span>{" "}
                     {(selected.confidence * 100).toFixed(0)}%
-                    <span
-                      className="inline-flex items-center cursor-help text-gray-400 dark:text-gray-500"
-                      title={CONFIDENCE_TOOLTIP}
-                    >
-                      <HelpCircle className="h-3.5 w-3.5" />
-                    </span>
+                    <ConfidenceHelpButton />
                   </p>
                   {selected.source && (
                     <p>
@@ -495,12 +517,7 @@ export default function IngredientsPage() {
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">
                     Confidence (0–1)
-                    <span
-                      className="inline-flex items-center cursor-help text-gray-400 dark:text-gray-500"
-                      title={CONFIDENCE_TOOLTIP}
-                    >
-                      <HelpCircle className="h-3.5 w-3.5" />
-                    </span>
+                    <ConfidenceHelpButton />
                   </Label>
                   <Input
                     type="number"

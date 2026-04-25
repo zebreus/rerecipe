@@ -19,13 +19,13 @@ import {
 } from "lucide-react";
 import { generateId, exportFilename, describeImportError } from "@/lib/utils";
 import type { ScoringProfile, Ingredient } from "@/lib/types";
-import { COMPONENT_KEYS, COMPONENT_LABELS, DEFAULT_PROJECT_SETTINGS } from "@/lib/types";
+import { COMPONENT_KEYS, COMPONENT_LABELS } from "@/lib/types";
 import { isUnmodifiedCommonIngredient } from "@/lib/common-ingredients";
 
 export default function SettingsPage() {
   const { data, updateProject, updateSettings, exportJSON, importJSON, resetToEmptyProject, loadExampleData, updateScoringProfiles } =
     useStore();
-  const settings = data.settings ?? DEFAULT_PROJECT_SETTINGS;
+  const settings = data.settings;
   const [projectName, setProjectName] = useState(data.project.name);
   const [importText, setImportText] = useState("");
   const [importStatus, setImportStatus] = useState<string | null>(null);
