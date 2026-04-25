@@ -2,6 +2,7 @@ import {
   type ProjectData,
   type Ingredient,
   EMPTY_COMPOSITION,
+  DEFAULT_PROJECT_SETTINGS,
 } from "./types";
 import {
   calculateFormulaComponents,
@@ -57,6 +58,7 @@ export function createDefaultProjectData(): ProjectData {
     ],
     attachments: [],
     notes: [],
+    settings: { ...DEFAULT_PROJECT_SETTINGS },
   };
 }
 

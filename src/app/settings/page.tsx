@@ -19,12 +19,13 @@ import {
 } from "lucide-react";
 import { generateId, exportFilename, describeImportError } from "@/lib/utils";
 import type { ScoringProfile, Ingredient } from "@/lib/types";
-import { COMPONENT_KEYS, COMPONENT_LABELS } from "@/lib/types";
+import { COMPONENT_KEYS, COMPONENT_LABELS, DEFAULT_PROJECT_SETTINGS } from "@/lib/types";
 import { isUnmodifiedCommonIngredient } from "@/lib/common-ingredients";
 
 export default function SettingsPage() {
-  const { data, updateProject, exportJSON, importJSON, resetToEmptyProject, loadExampleData, updateScoringProfiles } =
+  const { data, updateProject, updateSettings, exportJSON, importJSON, resetToEmptyProject, loadExampleData, updateScoringProfiles } =
     useStore();
+  const settings = data.settings ?? DEFAULT_PROJECT_SETTINGS;
   const [projectName, setProjectName] = useState(data.project.name);
   const [importText, setImportText] = useState("");
   const [importStatus, setImportStatus] = useState<string | null>(null);
@@ -200,6 +201,38 @@ export default function SettingsPage() {
           Project configuration, import/export
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Ingredient Table Columns</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Choose which optional columns are shown in the ingredient table.
+          </p>
+          <div className="space-y-2">
+            {(
+              [
+                { key: "showCategoryColumn", label: "Category" },
+                { key: "showDensityColumn", label: "Density" },
+                { key: "showCostColumn", label: "Cost" },
+              ] as const
+            ).map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={settings[key]}
+                  onChange={(e) =>
+                    updateSettings({ ...settings, [key]: e.target.checked })
+                  }
+                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 accent-indigo-600"
+                />
+                <span className="text-sm">{label}</span>
+              </label>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
