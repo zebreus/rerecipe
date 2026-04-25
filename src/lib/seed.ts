@@ -1,14 +1,14 @@
 import {
   type ProjectData,
   type Ingredient,
-  EMPTY_COMPOSITION,
+  DEFAULT_TARGET_NUTRITION,
   DEFAULT_PROJECT_SETTINGS,
 } from "./types";
 import {
-  calculateFormulaComponents,
+  calculateFormulaNutrition,
   calculateMassBalance,
-  componentsToPercent,
-  compositionSimilarity,
+  nutritionSimilarity,
+  totalFormulaMassG,
 } from "./solver";
 
 const now = () => new Date().toISOString();
@@ -33,7 +33,7 @@ export function createDefaultProjectData(): ProjectData {
         color: [],
         packaging: [],
       },
-      targetComposition: { ...EMPTY_COMPOSITION },
+      targetNutrition: DEFAULT_TARGET_NUTRITION.map((n) => ({ ...n })),
     },
     ingredients: [],
     formulas: [],
@@ -80,98 +80,98 @@ export function createSeedData(): ProjectData {
       color: ["Off-white", "Creamy"],
       packaging: ["Plastic pot", "Foil sealed", "Chilled"],
     },
-    targetComposition: {
-      water_pct: 62,
-      fat_pct: 3,
-      protein_pct: 3.5,
-      sugar_pct: 12,
-      starch_pct: 15,
-      salt_pct: 0.15,
-      hydrocolloid_pct: 0.35,
-      other_pct: 4,
-    },
+    targetNutrition: [
+      { name: "Energy", unit: "kcal", per100g: 110 },
+      { name: "Fat", unit: "g", per100g: 3 },
+      { name: "Saturated Fat", unit: "g", per100g: 1.8 },
+      { name: "Carbohydrates", unit: "g", per100g: 18 },
+      { name: "Sugar", unit: "g", per100g: 12 },
+      { name: "Protein", unit: "g", per100g: 3.5 },
+      { name: "Fibre", unit: "g", per100g: 0.3 },
+      { name: "Salt", unit: "g", per100g: 0.15 },
+    ],
   };
 
   data.ingredients = [
     makeIngredient("ing-1", "Whole Milk", "Dairy", 1.03, {
-      water_pct: 87,
-      fat_pct: 3.5,
-      protein_pct: 3.3,
-      sugar_pct: 4.8,
-      starch_pct: 0,
-      salt_pct: 0.1,
-      hydrocolloid_pct: 0,
-      other_pct: 1.3,
+      Energy: 61,
+      Fat: 3.5,
+      "Saturated Fat": 1.9,
+      Carbohydrates: 4.8,
+      Sugar: 4.8,
+      Protein: 3.3,
+      Fibre: 0,
+      Salt: 0.1,
     }, 1.2),
     makeIngredient("ing-2", "Short Grain Rice", "Grain", 0.85, {
-      water_pct: 12,
-      fat_pct: 0.6,
-      protein_pct: 6.7,
-      sugar_pct: 0.1,
-      starch_pct: 78,
-      salt_pct: 0,
-      hydrocolloid_pct: 0,
-      other_pct: 2.6,
+      Energy: 358,
+      Fat: 0.6,
+      "Saturated Fat": 0.2,
+      Carbohydrates: 79,
+      Sugar: 0.1,
+      Protein: 6.7,
+      Fibre: 1.4,
+      Salt: 0,
     }, 2.5),
     makeIngredient("ing-3", "Granulated Sugar", "Sugar & Sweetener", 1.55, {
-      water_pct: 0.1,
-      fat_pct: 0,
-      protein_pct: 0,
-      sugar_pct: 99.9,
-      starch_pct: 0,
-      salt_pct: 0,
-      hydrocolloid_pct: 0,
-      other_pct: 0,
+      Energy: 387,
+      Fat: 0,
+      "Saturated Fat": 0,
+      Carbohydrates: 99.9,
+      Sugar: 99.9,
+      Protein: 0,
+      Fibre: 0,
+      Salt: 0,
     }, 0.9),
     makeIngredient("ing-4", "Heavy Cream", "Dairy", 0.99, {
-      water_pct: 58,
-      fat_pct: 36,
-      protein_pct: 2.1,
-      sugar_pct: 2.8,
-      starch_pct: 0,
-      salt_pct: 0.05,
-      hydrocolloid_pct: 0,
-      other_pct: 1.05,
+      Energy: 340,
+      Fat: 36,
+      "Saturated Fat": 23,
+      Carbohydrates: 2.8,
+      Sugar: 2.8,
+      Protein: 2.1,
+      Fibre: 0,
+      Salt: 0.05,
     }, 6.5),
     makeIngredient("ing-5", "Modified Starch", "Starch", 0.6, {
-      water_pct: 10,
-      fat_pct: 0,
-      protein_pct: 0.3,
-      sugar_pct: 0,
-      starch_pct: 88,
-      salt_pct: 0,
-      hydrocolloid_pct: 0,
-      other_pct: 1.7,
+      Energy: 354,
+      Fat: 0,
+      "Saturated Fat": 0,
+      Carbohydrates: 88,
+      Sugar: 0,
+      Protein: 0.3,
+      Fibre: 0,
+      Salt: 0,
     }, 4.0),
     makeIngredient("ing-6", "Carrageenan", "Hydrocolloid", 0.65, {
-      water_pct: 10,
-      fat_pct: 0,
-      protein_pct: 0,
-      sugar_pct: 0,
-      starch_pct: 0,
-      salt_pct: 0,
-      hydrocolloid_pct: 85,
-      other_pct: 5,
+      Energy: 0,
+      Fat: 0,
+      "Saturated Fat": 0,
+      Carbohydrates: 0,
+      Sugar: 0,
+      Protein: 0,
+      Fibre: 85,
+      Salt: 0,
     }, 35.0),
     makeIngredient("ing-7", "Vanilla Extract", "Flavor", 0.88, {
-      water_pct: 52,
-      fat_pct: 0,
-      protein_pct: 0,
-      sugar_pct: 12,
-      starch_pct: 0,
-      salt_pct: 0,
-      hydrocolloid_pct: 0,
-      other_pct: 36,
+      Energy: 288,
+      Fat: 0.1,
+      "Saturated Fat": 0,
+      Carbohydrates: 12.7,
+      Sugar: 12.7,
+      Protein: 0.1,
+      Fibre: 0,
+      Salt: 0,
     }, 120.0),
     makeIngredient("ing-8", "Salt", "Salt", 2.16, {
-      water_pct: 0,
-      fat_pct: 0,
-      protein_pct: 0,
-      sugar_pct: 0,
-      starch_pct: 0,
-      salt_pct: 100,
-      hydrocolloid_pct: 0,
-      other_pct: 0,
+      Energy: 0,
+      Fat: 0,
+      "Saturated Fat": 0,
+      Carbohydrates: 0,
+      Sugar: 0,
+      Protein: 0,
+      Fibre: 0,
+      Salt: 100,
     }, 0.5),
   ];
 
@@ -192,17 +192,8 @@ export function createSeedData(): ProjectData {
         { ingredientId: "ing-7", massG: 1, locked: false },
         { ingredientId: "ing-8", massG: 0.3, locked: false },
       ],
-      calculatedComponents: {
-        water_g: 0,
-        fat_g: 0,
-        protein_g: 0,
-        sugar_g: 0,
-        starch_g: 0,
-        salt_g: 0,
-        hydrocolloid_g: 0,
-        other_g: 0,
-        total_g: 0,
-      },
+      calculatedNutrition: {},
+      totalMassG: 0,
       massBalance: {
         totalInputG: 195,
         totalOutputG: 200,
@@ -712,19 +703,23 @@ export function createSeedData(): ProjectData {
     },
   ];
 
-  // Recalculate formula components from ingredients
+  // Recalculate formula nutrition from ingredients
   for (const formula of data.formulas) {
-    formula.calculatedComponents = calculateFormulaComponents(
+    formula.totalMassG = totalFormulaMassG(formula.ingredientLines);
+    formula.calculatedNutrition = calculateFormulaNutrition(
       formula.ingredientLines,
-      data.ingredients
+      data.ingredients,
+      data.targetProduct.targetNutrition
     );
     formula.massBalance = calculateMassBalance(
       formula.ingredientLines,
       formula.targetMassG
     );
-    const pct = componentsToPercent(formula.calculatedComponents);
     formula.confidence =
-      compositionSimilarity(pct, data.targetProduct.targetComposition) / 100;
+      nutritionSimilarity(
+        formula.calculatedNutrition,
+        data.targetProduct.targetNutrition
+      ) / 100;
   }
 
   return data;
@@ -735,7 +730,7 @@ function makeIngredient(
   name: string,
   category: string,
   density: number,
-  composition: Ingredient["composition"],
+  nutrition: Ingredient["nutrition"],
   costPerKg: number = 0
 ): Ingredient {
   return {
@@ -743,7 +738,7 @@ function makeIngredient(
     name,
     category,
     density_g_ml: density,
-    composition,
+    nutrition,
     source: "",
     confidence: 0.9,
     costPerKg,

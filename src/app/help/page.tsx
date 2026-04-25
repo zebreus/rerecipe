@@ -38,7 +38,7 @@ const STEPS = [
     icon: FlaskConical,
     title: "3. Create Candidate Formulas",
     description:
-      "Build formulas by selecting ingredients and specifying masses. Use the auto-generate feature to create a starting formula from your target composition, then refine.",
+      "Build formulas by selecting ingredients and specifying masses. Use the calculated nutrition values and comparison charts to refine the formula toward your target.",
     tips: [
       "Use the composition comparison chart to see gaps vs target",
       "Lock ingredient lines you don't want the solver to change",

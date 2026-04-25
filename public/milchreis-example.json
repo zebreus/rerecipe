@@ -1,12 +1,12 @@
 {
   "project": {
     "id": "single-project",
-    "name": "Müller Clone Reverse Engineering",
+    "name": "M\u00fcller Clone Reverse Engineering",
     "createdAt": "2026-04-25T14:04:14.058Z",
     "updatedAt": "2026-04-25T14:04:14.059Z"
   },
   "targetProduct": {
-    "name": "Müller Rice – Original",
+    "name": "M\u00fcller Rice \u2013 Original",
     "description": "Creamy rice pudding dessert. Thick, spoonable texture with soft rice grains in a smooth, sweet dairy base.",
     "targetMassG": 200,
     "targetVolumeMl": 190,
@@ -32,16 +32,48 @@
         "Chilled"
       ]
     },
-    "targetComposition": {
-      "water_pct": 62,
-      "fat_pct": 3,
-      "protein_pct": 3.5,
-      "sugar_pct": 12,
-      "starch_pct": 15,
-      "salt_pct": 0.15,
-      "hydrocolloid_pct": 0.35,
-      "other_pct": 4
-    }
+    "targetNutrition": [
+      {
+        "name": "Energy",
+        "unit": "kcal",
+        "per100g": 110
+      },
+      {
+        "name": "Fat",
+        "unit": "g",
+        "per100g": 3
+      },
+      {
+        "name": "Saturated Fat",
+        "unit": "g",
+        "per100g": 1.8
+      },
+      {
+        "name": "Carbohydrates",
+        "unit": "g",
+        "per100g": 18
+      },
+      {
+        "name": "Sugar",
+        "unit": "g",
+        "per100g": 12
+      },
+      {
+        "name": "Protein",
+        "unit": "g",
+        "per100g": 3.5
+      },
+      {
+        "name": "Fibre",
+        "unit": "g",
+        "per100g": 0.3
+      },
+      {
+        "name": "Salt",
+        "unit": "g",
+        "per100g": 0.15
+      }
+    ]
   },
   "ingredients": [
     {
@@ -49,16 +81,6 @@
       "name": "Whole Milk",
       "category": "Dairy",
       "density_g_ml": 1.03,
-      "composition": {
-        "water_pct": 87,
-        "fat_pct": 3.5,
-        "protein_pct": 3.3,
-        "sugar_pct": 4.8,
-        "starch_pct": 0,
-        "salt_pct": 0.1,
-        "hydrocolloid_pct": 0,
-        "other_pct": 1.3
-      },
       "source": "",
       "confidence": 0.9,
       "costPerKg": 1.2,
@@ -66,23 +88,23 @@
       "constraints": [],
       "notes": "",
       "createdAt": "2026-04-25T14:04:14.059Z",
-      "updatedAt": "2026-04-25T14:04:14.059Z"
+      "updatedAt": "2026-04-25T14:04:14.059Z",
+      "nutrition": {
+        "Energy": 61,
+        "Fat": 3.5,
+        "Saturated Fat": 1.9,
+        "Carbohydrates": 4.8,
+        "Sugar": 4.8,
+        "Protein": 3.3,
+        "Fibre": 0,
+        "Salt": 0.1
+      }
     },
     {
       "id": "ing-2",
       "name": "Short Grain Rice",
       "category": "Grain",
       "density_g_ml": 0.85,
-      "composition": {
-        "water_pct": 12,
-        "fat_pct": 0.6,
-        "protein_pct": 6.7,
-        "sugar_pct": 0.1,
-        "starch_pct": 78,
-        "salt_pct": 0,
-        "hydrocolloid_pct": 0,
-        "other_pct": 2.6
-      },
       "source": "",
       "confidence": 0.9,
       "costPerKg": 2.5,
@@ -90,23 +112,23 @@
       "constraints": [],
       "notes": "",
       "createdAt": "2026-04-25T14:04:14.059Z",
-      "updatedAt": "2026-04-25T14:04:14.059Z"
+      "updatedAt": "2026-04-25T14:04:14.059Z",
+      "nutrition": {
+        "Energy": 358,
+        "Fat": 0.6,
+        "Saturated Fat": 0.2,
+        "Carbohydrates": 79,
+        "Sugar": 0.1,
+        "Protein": 6.7,
+        "Fibre": 1.4,
+        "Salt": 0
+      }
     },
     {
       "id": "ing-3",
       "name": "Granulated Sugar",
       "category": "Sugar & Sweetener",
       "density_g_ml": 1.55,
-      "composition": {
-        "water_pct": 0.1,
-        "fat_pct": 0,
-        "protein_pct": 0,
-        "sugar_pct": 99.9,
-        "starch_pct": 0,
-        "salt_pct": 0,
-        "hydrocolloid_pct": 0,
-        "other_pct": 0
-      },
       "source": "",
       "confidence": 0.9,
       "costPerKg": 0.9,
@@ -114,23 +136,23 @@
       "constraints": [],
       "notes": "",
       "createdAt": "2026-04-25T14:04:14.059Z",
-      "updatedAt": "2026-04-25T14:04:14.059Z"
+      "updatedAt": "2026-04-25T14:04:14.059Z",
+      "nutrition": {
+        "Energy": 387,
+        "Fat": 0,
+        "Saturated Fat": 0,
+        "Carbohydrates": 99.9,
+        "Sugar": 99.9,
+        "Protein": 0,
+        "Fibre": 0,
+        "Salt": 0
+      }
     },
     {
       "id": "ing-4",
       "name": "Heavy Cream",
       "category": "Dairy",
       "density_g_ml": 0.99,
-      "composition": {
-        "water_pct": 58,
-        "fat_pct": 36,
-        "protein_pct": 2.1,
-        "sugar_pct": 2.8,
-        "starch_pct": 0,
-        "salt_pct": 0.05,
-        "hydrocolloid_pct": 0,
-        "other_pct": 1.05
-      },
       "source": "",
       "confidence": 0.9,
       "costPerKg": 6.5,
@@ -138,23 +160,23 @@
       "constraints": [],
       "notes": "",
       "createdAt": "2026-04-25T14:04:14.059Z",
-      "updatedAt": "2026-04-25T14:04:14.059Z"
+      "updatedAt": "2026-04-25T14:04:14.059Z",
+      "nutrition": {
+        "Energy": 340,
+        "Fat": 36,
+        "Saturated Fat": 23,
+        "Carbohydrates": 2.8,
+        "Sugar": 2.8,
+        "Protein": 2.1,
+        "Fibre": 0,
+        "Salt": 0.05
+      }
     },
     {
       "id": "ing-5",
       "name": "Modified Starch",
       "category": "Starch",
       "density_g_ml": 0.6,
-      "composition": {
-        "water_pct": 10,
-        "fat_pct": 0,
-        "protein_pct": 0.3,
-        "sugar_pct": 0,
-        "starch_pct": 88,
-        "salt_pct": 0,
-        "hydrocolloid_pct": 0,
-        "other_pct": 1.7
-      },
       "source": "",
       "confidence": 0.9,
       "costPerKg": 4,
@@ -162,23 +184,23 @@
       "constraints": [],
       "notes": "",
       "createdAt": "2026-04-25T14:04:14.059Z",
-      "updatedAt": "2026-04-25T14:04:14.059Z"
+      "updatedAt": "2026-04-25T14:04:14.059Z",
+      "nutrition": {
+        "Energy": 354,
+        "Fat": 0,
+        "Saturated Fat": 0,
+        "Carbohydrates": 88,
+        "Sugar": 0,
+        "Protein": 0.3,
+        "Fibre": 0,
+        "Salt": 0
+      }
     },
     {
       "id": "ing-6",
       "name": "Carrageenan",
       "category": "Hydrocolloid",
       "density_g_ml": 0.65,
-      "composition": {
-        "water_pct": 10,
-        "fat_pct": 0,
-        "protein_pct": 0,
-        "sugar_pct": 0,
-        "starch_pct": 0,
-        "salt_pct": 0,
-        "hydrocolloid_pct": 85,
-        "other_pct": 5
-      },
       "source": "",
       "confidence": 0.9,
       "costPerKg": 35,
@@ -186,23 +208,23 @@
       "constraints": [],
       "notes": "",
       "createdAt": "2026-04-25T14:04:14.059Z",
-      "updatedAt": "2026-04-25T14:04:14.059Z"
+      "updatedAt": "2026-04-25T14:04:14.059Z",
+      "nutrition": {
+        "Energy": 0,
+        "Fat": 0,
+        "Saturated Fat": 0,
+        "Carbohydrates": 0,
+        "Sugar": 0,
+        "Protein": 0,
+        "Fibre": 85,
+        "Salt": 0
+      }
     },
     {
       "id": "ing-7",
       "name": "Vanilla Extract",
       "category": "Flavor",
       "density_g_ml": 0.88,
-      "composition": {
-        "water_pct": 52,
-        "fat_pct": 0,
-        "protein_pct": 0,
-        "sugar_pct": 12,
-        "starch_pct": 0,
-        "salt_pct": 0,
-        "hydrocolloid_pct": 0,
-        "other_pct": 36
-      },
       "source": "",
       "confidence": 0.9,
       "costPerKg": 120,
@@ -210,23 +232,23 @@
       "constraints": [],
       "notes": "",
       "createdAt": "2026-04-25T14:04:14.059Z",
-      "updatedAt": "2026-04-25T14:04:14.059Z"
+      "updatedAt": "2026-04-25T14:04:14.059Z",
+      "nutrition": {
+        "Energy": 288,
+        "Fat": 0.1,
+        "Saturated Fat": 0,
+        "Carbohydrates": 12.7,
+        "Sugar": 12.7,
+        "Protein": 0.1,
+        "Fibre": 0,
+        "Salt": 0
+      }
     },
     {
       "id": "ing-8",
       "name": "Salt",
       "category": "Salt",
       "density_g_ml": 2.16,
-      "composition": {
-        "water_pct": 0,
-        "fat_pct": 0,
-        "protein_pct": 0,
-        "sugar_pct": 0,
-        "starch_pct": 0,
-        "salt_pct": 100,
-        "hydrocolloid_pct": 0,
-        "other_pct": 0
-      },
       "source": "",
       "confidence": 0.9,
       "costPerKg": 0.5,
@@ -234,13 +256,23 @@
       "constraints": [],
       "notes": "",
       "createdAt": "2026-04-25T14:04:14.059Z",
-      "updatedAt": "2026-04-25T14:04:14.059Z"
+      "updatedAt": "2026-04-25T14:04:14.059Z",
+      "nutrition": {
+        "Energy": 0,
+        "Fat": 0,
+        "Saturated Fat": 0,
+        "Carbohydrates": 0,
+        "Sugar": 0,
+        "Protein": 0,
+        "Fibre": 0,
+        "Salt": 100
+      }
     }
   ],
   "formulas": [
     {
       "id": "formula-1",
-      "name": "Candidate A – Milk-heavy",
+      "name": "Candidate A \u2013 Milk-heavy",
       "description": "High milk ratio with cream for richness",
       "version": 1,
       "targetMassG": 200,
@@ -286,17 +318,6 @@
           "locked": false
         }
       ],
-      "calculatedComponents": {
-        "water_g": 124.10399999999998,
-        "fat_g": 8.36,
-        "protein_g": 6.856999999999999,
-        "sugar_g": 20.661000000000005,
-        "starch_g": 30.82,
-        "salt_g": 0.435,
-        "hydrocolloid_g": 0.595,
-        "other_g": 3.168,
-        "total_g": 195
-      },
       "massBalance": {
         "totalInputG": 195,
         "totalOutputG": 200,
@@ -307,7 +328,9 @@
       "confidence": 0.8564,
       "notes": "Initial milk-heavy formulation",
       "createdAt": "2026-04-25T14:04:14.059Z",
-      "updatedAt": "2026-04-25T14:04:14.059Z"
+      "updatedAt": "2026-04-25T14:04:14.059Z",
+      "calculatedNutrition": {},
+      "totalMassG": 195.0
     }
   ],
   "protocols": [
@@ -354,7 +377,7 @@
           "id": "step-3",
           "order": 3,
           "name": "Bring to Simmer",
-          "description": "Heat to 85°C, stirring frequently",
+          "description": "Heat to 85\u00b0C, stirring frequently",
           "temperatureC": 85,
           "durationMin": 10,
           "agitationLevel": "medium",
@@ -388,12 +411,12 @@
           "id": "step-5",
           "order": 5,
           "name": "Cook & Hold",
-          "description": "Continue cooking at 85°C until rice is fully tender and base is thick",
+          "description": "Continue cooking at 85\u00b0C until rice is fully tender and base is thick",
           "temperatureC": 85,
           "durationMin": 20,
           "agitationLevel": "medium",
           "additionIngredients": [],
-          "holdConditions": "Maintain 85°C ± 2°C",
+          "holdConditions": "Maintain 85\u00b0C \u00b1 2\u00b0C",
           "expectedEffects": [
             "Full starch hydration",
             "Viscosity development",
@@ -424,7 +447,7 @@
           "id": "step-7",
           "order": 7,
           "name": "Cool",
-          "description": "Cool to 20°C in ice bath or blast chiller",
+          "description": "Cool to 20\u00b0C in ice bath or blast chiller",
           "temperatureC": 20,
           "durationMin": 30,
           "agitationLevel": "low",
@@ -536,7 +559,7 @@
             "ing-4",
             "ing-7"
           ],
-          "holdConditions": "Cool to <25°C within 30 min",
+          "holdConditions": "Cool to <25\u00b0C within 30 min",
           "expectedEffects": [
             "Fat enrichment",
             "Flavor addition",
@@ -567,7 +590,7 @@
       "runNumber": 1,
       "status": "completed",
       "actualParameters": {
-        "Final temp": "84°C",
+        "Final temp": "84\u00b0C",
         "Cook time": "22 min",
         "Cool time": "35 min"
       },
@@ -587,7 +610,7 @@
         {
           "name": "Final viscosity",
           "value": 3200,
-          "unit": "mPa·s"
+          "unit": "mPa\u00b7s"
         },
         {
           "name": "pH",
@@ -671,7 +694,7 @@
       "runNumber": 2,
       "status": "completed",
       "actualParameters": {
-        "Final temp": "85°C",
+        "Final temp": "85\u00b0C",
         "Cook time": "25 min",
         "Cool time": "32 min"
       },
@@ -691,7 +714,7 @@
         {
           "name": "Final viscosity",
           "value": 3800,
-          "unit": "mPa·s"
+          "unit": "mPa\u00b7s"
         },
         {
           "name": "pH",
@@ -775,7 +798,7 @@
       "runNumber": 3,
       "status": "completed",
       "actualParameters": {
-        "Final temp": "85°C",
+        "Final temp": "85\u00b0C",
         "Cook time": "24 min",
         "Cool time": "33 min"
       },
@@ -795,7 +818,7 @@
         {
           "name": "Final viscosity",
           "value": 3650,
-          "unit": "mPa·s"
+          "unit": "mPa\u00b7s"
         },
         {
           "name": "pH",
@@ -905,7 +928,7 @@
         {
           "name": "Final viscosity",
           "value": 4200,
-          "unit": "mPa·s"
+          "unit": "mPa\u00b7s"
         },
         {
           "name": "pH",
@@ -1010,7 +1033,7 @@
         {
           "name": "Final viscosity",
           "value": 3900,
-          "unit": "mPa·s"
+          "unit": "mPa\u00b7s"
         },
         {
           "name": "pH",
@@ -1115,7 +1138,7 @@
         {
           "name": "Final viscosity",
           "value": 4000,
-          "unit": "mPa·s"
+          "unit": "mPa\u00b7s"
         },
         {
           "name": "pH",

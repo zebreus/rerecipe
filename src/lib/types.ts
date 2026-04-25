@@ -14,43 +14,95 @@ export interface ObservedAttributes {
   packaging: string[];
 }
 
+// ─── Nutritional Values ───
+// Each nutritional value is identified by its `name` (the id/key within a
+// project's target). The `unit` is a short unit specifier like "kcal" or "g".
+// `per100g` is the value per 100 g of the substance (the target product, or
+// an ingredient).
+export interface NutritionalValue {
+  name: string;
+  unit: string;
+  per100g: number;
+}
+
+// Default target nutritional values, based on the German "Nährwertangaben"
+// standard (translated to English). Used when creating a new project.
+export const DEFAULT_TARGET_NUTRITION: NutritionalValue[] = [
+  { name: "Energy", unit: "kcal", per100g: 0 },
+  { name: "Fat", unit: "g", per100g: 0 },
+  { name: "Saturated Fat", unit: "g", per100g: 0 },
+  { name: "Carbohydrates", unit: "g", per100g: 0 },
+  { name: "Sugar", unit: "g", per100g: 0 },
+  { name: "Protein", unit: "g", per100g: 0 },
+  { name: "Fibre", unit: "g", per100g: 0 },
+  { name: "Salt", unit: "g", per100g: 0 },
+];
+
+// Common nutritional value names offered when adding a new entry. Chosen so
+// they line up with the names used in the quick-add ingredient presets.
+export const COMMON_NUTRITION_OPTIONS: { name: string; unit: string }[] = [
+  { name: "Energy", unit: "kcal" },
+  { name: "Fat", unit: "g" },
+  { name: "Saturated Fat", unit: "g" },
+  { name: "Carbohydrates", unit: "g" },
+  { name: "Sugar", unit: "g" },
+  { name: "Protein", unit: "g" },
+  { name: "Fibre", unit: "g" },
+  { name: "Salt", unit: "g" },
+  { name: "Water", unit: "g" },
+  { name: "Starch", unit: "g" },
+  { name: "Sodium", unit: "mg" },
+  { name: "Cholesterol", unit: "mg" },
+];
+
+// Common units offered when adding a new entry.
+export const COMMON_NUTRITION_UNITS = ["g", "mg", "µg", "kcal", "kJ"] as const;
+
+// Color palette for nutritional values; assigned deterministically by name
+// so the same nutrient gets the same color across the app.
+const NUTRITION_COLOR_PALETTE = [
+  "#3b82f6", // blue
+  "#f59e0b", // amber
+  "#ef4444", // red
+  "#8b5cf6", // violet
+  "#10b981", // emerald
+  "#6b7280", // gray
+  "#ec4899", // pink
+  "#a3a3a3", // neutral
+  "#0ea5e9", // sky
+  "#84cc16", // lime
+  "#f97316", // orange
+  "#14b8a6", // teal
+];
+
+export function nutritionColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  return NUTRITION_COLOR_PALETTE[hash % NUTRITION_COLOR_PALETTE.length];
+}
+
 export interface TargetProduct {
   name: string;
   description: string;
   targetMassG: number;
   targetVolumeMl: number;
   observedAttributes: ObservedAttributes;
-  targetComposition: ComponentComposition;
+  // Editable list of tracked nutritional values (the project's source of
+  // truth for which nutrients are relevant). Indexed by `name`.
+  targetNutrition: NutritionalValue[];
 }
-
-export interface ComponentComposition {
-  water_pct: number;
-  fat_pct: number;
-  protein_pct: number;
-  sugar_pct: number;
-  starch_pct: number;
-  salt_pct: number;
-  hydrocolloid_pct: number;
-  other_pct: number;
-}
-
-export const EMPTY_COMPOSITION: ComponentComposition = {
-  water_pct: 0,
-  fat_pct: 0,
-  protein_pct: 0,
-  sugar_pct: 0,
-  starch_pct: 0,
-  salt_pct: 0,
-  hydrocolloid_pct: 0,
-  other_pct: 0,
-};
 
 export interface Ingredient {
   id: string;
   name: string;
   category: string;
   density_g_ml: number;
-  composition: ComponentComposition;
+  // Nutritional values per 100 g of the ingredient, keyed by the
+  // nutritional value name. Only entries whose name is also tracked by the
+  // target are considered/shown elsewhere in the app.
+  nutrition: Record<string, number>;
   source: string;
   confidence: number; // 0–1
   costPerKg: number;
@@ -77,17 +129,10 @@ export interface MassBalance {
   waterAdjustmentG: number;
 }
 
-export interface CalculatedComponents {
-  water_g: number;
-  fat_g: number;
-  protein_g: number;
-  sugar_g: number;
-  starch_g: number;
-  salt_g: number;
-  hydrocolloid_g: number;
-  other_g: number;
-  total_g: number;
-}
+// Calculated nutrition for a formula, expressed per 100 g of formula mass,
+// keyed by nutritional value name. Only the names tracked by the target
+// are populated.
+export type CalculatedNutrition = Record<string, number>;
 
 export interface Formula {
   id: string;
@@ -96,7 +141,9 @@ export interface Formula {
   version: number;
   targetMassG: number;
   ingredientLines: FormulaLine[];
-  calculatedComponents: CalculatedComponents;
+  // Per-100g nutritional values for the formula, keyed by nutrient name.
+  calculatedNutrition: CalculatedNutrition;
+  totalMassG: number;
   massBalance: MassBalance;
   confidence: number;
   notes: string;
@@ -230,40 +277,6 @@ export interface ProjectData {
   notes: Note[];
   settings: ProjectSettings;
 }
-
-// ─── Component keys helper ───
-export const COMPONENT_KEYS = [
-  "water_pct",
-  "fat_pct",
-  "protein_pct",
-  "sugar_pct",
-  "starch_pct",
-  "salt_pct",
-  "hydrocolloid_pct",
-  "other_pct",
-] as const;
-
-export const COMPONENT_LABELS: Record<string, string> = {
-  water_pct: "Water",
-  fat_pct: "Fat",
-  protein_pct: "Protein",
-  sugar_pct: "Sugar",
-  starch_pct: "Starch",
-  salt_pct: "Salt",
-  hydrocolloid_pct: "Hydrocolloid",
-  other_pct: "Other",
-};
-
-export const COMPONENT_COLORS: Record<string, string> = {
-  water_pct: "#3b82f6",
-  fat_pct: "#f59e0b",
-  protein_pct: "#ef4444",
-  sugar_pct: "#8b5cf6",
-  starch_pct: "#10b981",
-  salt_pct: "#6b7280",
-  hydrocolloid_pct: "#ec4899",
-  other_pct: "#a3a3a3",
-};
 
 export const SCORING_DIMENSION_DEFAULTS = [
   "Viscosity",

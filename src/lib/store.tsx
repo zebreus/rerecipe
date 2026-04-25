@@ -23,8 +23,9 @@ import type {
 import { DEFAULT_PROJECT_SETTINGS } from "./types";
 import { createSeedData, createDefaultProjectData } from "./seed";
 import {
-  calculateFormulaComponents,
+  calculateFormulaNutrition,
   calculateMassBalance,
+  totalFormulaMassG,
 } from "./solver";
 
 const STORAGE_KEY = "recipe-reverse-eng-project";
@@ -43,16 +44,52 @@ function normalizeProjectData(
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isValidTargetNutritionEntry(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.name === "string" &&
+    typeof value.unit === "string" &&
+    isFiniteNumber(value.per100g)
+  );
+}
+
+// Returns true if `parsed` looks like the current schema (new flexible
+// nutritional values model). Old pre-refactor data is rejected so we
+// don't need a migration path.
+function isCurrentSchema(parsed: unknown): boolean {
+  if (!isRecord(parsed)) return false;
+  if (!Array.isArray(parsed.ingredients) || !Array.isArray(parsed.formulas)) {
+    return false;
+  }
+  const targetProduct = parsed.targetProduct;
+  if (!isRecord(targetProduct)) return false;
+  const targetNutrition = targetProduct.targetNutrition;
+  if (!Array.isArray(targetNutrition)) return false;
+  return targetNutrition.every(isValidTargetNutritionEntry);
+}
+
 function loadData(): ProjectData {
   if (typeof window === "undefined") return createDefaultProjectData();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      return normalizeProjectData(
-        JSON.parse(raw) as Omit<ProjectData, "settings"> & {
-          settings?: Partial<ProjectSettings>;
-        }
-      );
+      const parsed = JSON.parse(raw);
+      if (isCurrentSchema(parsed)) {
+        return normalizeProjectData(
+          parsed as Omit<ProjectData, "settings"> & {
+            settings?: Partial<ProjectSettings>;
+          }
+        );
+      }
+      // Old/incompatible data: drop it and start fresh (no migration path).
     }
   } catch {
     /* ignore */
@@ -181,21 +218,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // ─── Formulas ───
   const addFormula = useCallback(
     (f: Formula) => {
-      const recalc = recalcFormulaObj(f, data.ingredients);
+      const recalc = recalcFormulaObj(f, data.ingredients, data.targetProduct);
       persist({ ...data, formulas: [...data.formulas, recalc] });
     },
     [data, persist]
   );
   const addFormulas = useCallback(
     (formulas: Formula[]) => {
-      const recalced = formulas.map((f) => recalcFormulaObj(f, data.ingredients));
+      const recalced = formulas.map((f) => recalcFormulaObj(f, data.ingredients, data.targetProduct));
       persist({ ...data, formulas: [...data.formulas, ...recalced] });
     },
     [data, persist]
   );
   const updateFormula = useCallback(
     (f: Formula) => {
-      const recalc = recalcFormulaObj(f, data.ingredients);
+      const recalc = recalcFormulaObj(f, data.ingredients, data.targetProduct);
       persist({
         ...data,
         formulas: data.formulas.map((x) => (x.id === recalc.id ? recalc : x)),
@@ -213,7 +250,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       const f = data.formulas.find((x) => x.id === id);
       if (!f) return;
-      const recalc = recalcFormulaObj(f, data.ingredients);
+      const recalc = recalcFormulaObj(f, data.ingredients, data.targetProduct);
       persist({
         ...data,
         formulas: data.formulas.map((x) => (x.id === id ? recalc : x)),
@@ -332,11 +369,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const importJSON = useCallback(
     (json: string) => {
       try {
-        const parsed = JSON.parse(json) as Omit<ProjectData, "settings"> & {
+        const parsed = JSON.parse(json);
+        if (!isCurrentSchema(parsed)) return false;
+        const typed = parsed as Omit<ProjectData, "settings"> & {
           settings?: Partial<ProjectSettings>;
         };
-        if (!parsed.project || !parsed.ingredients) return false;
-        persist(normalizeProjectData(parsed));
+        if (!typed.project || !typed.ingredients) return false;
+        persist(normalizeProjectData(typed));
         return true;
       } catch {
         return false;
@@ -404,12 +443,21 @@ export function useStore(): StoreContextValue {
 }
 
 // ─── Internal helpers ───
-function recalcFormulaObj(f: Formula, ingredients: Ingredient[]): Formula {
-  const components = calculateFormulaComponents(f.ingredientLines, ingredients);
+function recalcFormulaObj(
+  f: Formula,
+  ingredients: Ingredient[],
+  target: ProjectData["targetProduct"]
+): Formula {
+  const calculatedNutrition = calculateFormulaNutrition(
+    f.ingredientLines,
+    ingredients,
+    target.targetNutrition
+  );
   const massBalance = calculateMassBalance(f.ingredientLines, f.targetMassG);
   return {
     ...f,
-    calculatedComponents: components,
+    calculatedNutrition,
+    totalMassG: totalFormulaMassG(f.ingredientLines),
     massBalance,
     updatedAt: new Date().toISOString(),
   };

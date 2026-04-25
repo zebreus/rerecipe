@@ -22,15 +22,10 @@ import {
   Play,
 } from "lucide-react";
 import {
-  calculateFormulaComponents,
-  componentsToPercent,
+  calculateFormulaNutrition,
   calculateSimilarityScore,
   rankTrials,
 } from "@/lib/solver";
-import {
-  COMPONENT_KEYS,
-  COMPONENT_LABELS,
-} from "@/lib/types";
 import {
   BarChart,
   Bar,
@@ -63,21 +58,18 @@ export default function DashboardPage() {
   const gapData = useMemo(
     () =>
       formulas.length > 0
-        ? COMPONENT_KEYS.map((key) => {
-            const label = COMPONENT_LABELS[key];
-            const targetVal = targetProduct.targetComposition[key];
-            const bestFormulaComps = bestFormula
-              ? componentsToPercent(
-                  calculateFormulaComponents(
-                    bestFormula.ingredientLines,
-                    ingredients
-                  )
+        ? targetProduct.targetNutrition.map((n) => {
+            const bestFormulaCalc = bestFormula
+              ? calculateFormulaNutrition(
+                  bestFormula.ingredientLines,
+                  ingredients,
+                  targetProduct.targetNutrition
                 )
               : null;
             return {
-              name: label,
-              Target: targetVal,
-              Best: bestFormulaComps ? bestFormulaComps[key] : 0,
+              name: n.name,
+              Target: n.per100g,
+              Best: bestFormulaCalc ? bestFormulaCalc[n.name] ?? 0 : 0,
             };
           })
         : [],
