@@ -57,6 +57,14 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   const { data, updateFormula, addTrial } = useStore();
   const router = useRouter();
 
+  // Thresholds used when colour-coding nutrition deviations from target.
+  const DEVIATION_LOW_PCT = 10;   // ≤ this → green
+  const DEVIATION_HIGH_PCT = 25;  // ≤ this → yellow, > this → red
+  // Minimum denominator to avoid division-by-zero in relative-error calculations.
+  const MIN_DEVIATION_DENOM = 1e-3;
+  // Mass tolerance (g) below which the formula total is considered to match target.
+  const MASS_TOLERANCE_G = 0.05;
+
   const formula = data.formulas.find((f) => f.id === id);
   const [local, setLocal] = useState<Formula | null>(formula ? { ...formula } : null);
   const [dirty, setDirty] = useState(false);
@@ -376,7 +384,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                       </p>
                       <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center justify-center gap-1">
                         <Info className="h-3.5 w-3.5 shrink-0" />
-                        Add ingredients, set a target mass, then click <strong>&nbsp;Run Solver&nbsp;</strong> to automatically adjust masses to match your target nutrition.
+                        Add ingredients, set a target mass, then click <strong>Run Solver</strong> to automatically adjust masses to match your target nutrition.
                         Lock any ingredient whose mass you want to keep fixed.
                       </p>
                     </div>
@@ -535,14 +543,14 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                           <tr className="border-t">
                             <td className="py-2 font-medium text-gray-900 dark:text-gray-100">Total</td>
                             <td className="py-2 font-medium text-gray-900 dark:text-gray-100">
-                              <span className={`${Math.abs(mb.lossG) > 0.05 ? (mb.lossG > 0 ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400") : ""}`}>
+                              <span className={`${Math.abs(mb.lossG) > MASS_TOLERANCE_G ? (mb.lossG > 0 ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400") : ""}`}>
                                 {local.ingredientLines.reduce((sum, l) => sum + l.massG, 0).toFixed(1)} g
                               </span>
                               {local.targetMassG > 0 && (
                                 <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                                  {mb.lossG > 0.05
+                                  {mb.lossG > MASS_TOLERANCE_G
                                     ? `(+${mb.lossG.toFixed(1)} g vs target)`
-                                    : mb.lossG < -0.05
+                                    : mb.lossG < -MASS_TOLERANCE_G
                                     ? `(${mb.lossG.toFixed(1)} g vs target)`
                                     : "(matches target)"}
                                 </span>
@@ -592,12 +600,12 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                         const formulaVal = calc[n.name] ?? 0;
                         const targetVal = n.per100g;
                         const diff = formulaVal - targetVal;
-                        const denom = Math.max(Math.abs(targetVal), Math.abs(formulaVal), 1e-3);
+                        const denom = Math.max(Math.abs(targetVal), Math.abs(formulaVal), MIN_DEVIATION_DENOM);
                         const relPct = (Math.abs(diff) / denom) * 100;
                         const diffColor =
-                          relPct <= 10
+                          relPct <= DEVIATION_LOW_PCT
                             ? "text-green-600 dark:text-green-400"
-                            : relPct <= 25
+                            : relPct <= DEVIATION_HIGH_PCT
                             ? "text-yellow-600 dark:text-yellow-400"
                             : "text-red-600 dark:text-red-400";
                         return (

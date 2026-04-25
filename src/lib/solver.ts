@@ -443,6 +443,10 @@ export function runFormulaOptimizer(
       ? unlocked.map((l) => l.massG / currentTotal)
       : unlocked.map(() => 1 / J);
 
+  // 400 iterations is sufficient for practical food formulations (typically
+  // ≤ 15 ingredients, ≤ 10 nutrients).  Most problems converge within 100
+  // iterations; the extra headroom handles ill-conditioned matrices without a
+  // significant runtime cost (each iteration is O(J*N) ≈ O(150) ops).
   const MAX_ITER = 400;
   // Normalise learning rate by the typical scale of A to improve convergence.
   const aMax = A.flat().reduce((m, v) => Math.max(m, Math.abs(v)), 1);
