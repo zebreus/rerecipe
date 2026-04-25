@@ -83,6 +83,16 @@ export function nutritionColor(name: string): string {
   return NUTRITION_COLOR_PALETTE[hash % NUTRITION_COLOR_PALETTE.length];
 }
 
+// An entry in the ordered list of expected ingredients for the target product.
+// The array order represents the expected descending mass-percentage order
+// (as printed on an ingredient label). `targetPct` is the expected mass
+// percentage (0–100) in the finished product; it is optional — leave it
+// undefined when only the order is known.
+export interface TargetIngredient {
+  ingredientId: string;
+  targetPct?: number; // expected mass% in the finished product (0–100)
+}
+
 export interface TargetProduct {
   name: string;
   description: string;
@@ -92,6 +102,10 @@ export interface TargetProduct {
   // Editable list of tracked nutritional values (the project's source of
   // truth for which nutrients are relevant). Indexed by `name`.
   targetNutrition: NutritionalValue[];
+  // Ordered list of expected ingredients (descending by mass percentage, as
+  // they appear on the product label). Used to pre-populate new formulas and
+  // to warn when a formula deviates from the expected composition.
+  targetIngredients: TargetIngredient[];
 }
 
 export interface Ingredient {

@@ -28,7 +28,7 @@ import {
 import { generateId } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import type { Formula } from "@/lib/types";
+import type { Formula, FormulaLine } from "@/lib/types";
 import {
   calculateFormulaNutrition,
   calculateMassBalance,
@@ -77,18 +77,52 @@ function FormulasListView() {
   function handleCreate() {
     if (!newName.trim()) return;
     const now = new Date().toISOString();
+
+    // Pre-populate ingredient lines from the target ingredient order.
+    // Skip when targetMassG is zero or negative.
+    const targetIngredients = data.targetProduct.targetIngredients ?? [];
+    const targetMassG = data.targetProduct.targetMassG;
+
+    let ingredientLines: FormulaLine[] = [];
+    if (targetIngredients.length > 0 && targetMassG > 0) {
+      const withPct = targetIngredients.filter((ti) => ti.targetPct !== undefined);
+      const withoutPct = targetIngredients.filter((ti) => ti.targetPct === undefined);
+      const usedPct = withPct.reduce((sum, ti) => sum + (ti.targetPct ?? 0), 0);
+      const remainingPct = Math.max(0, 100 - usedPct);
+      const perUndefinedPct =
+        withoutPct.length > 0 ? remainingPct / withoutPct.length : 0;
+
+      // Compute raw masses from percentages (no floor clamp).
+      const rawLines = targetIngredients.map((ti) => {
+        const pct = ti.targetPct ?? perUndefinedPct;
+        return {
+          ingredientId: ti.ingredientId,
+          massG: (pct / 100) * targetMassG,
+          locked: false,
+        };
+      });
+
+      // Scale so the total exactly equals targetMassG.
+      const rawTotal = rawLines.reduce((s, l) => s + l.massG, 0);
+      const scale = rawTotal > 0 ? targetMassG / rawTotal : 1;
+      ingredientLines = rawLines.map((l) => ({
+        ...l,
+        massG: Math.round(l.massG * scale * 10) / 10,
+      }));
+    }
+
     const f: Formula = {
       id: generateId(),
       name: newName.trim(),
       description: newDesc.trim(),
       version: 1,
-      targetMassG: data.targetProduct.targetMassG,
-      ingredientLines: [],
+      targetMassG,
+      ingredientLines,
       calculatedNutrition: {},
       totalMassG: 0,
       massBalance: {
         totalInputG: 0,
-        totalOutputG: data.targetProduct.targetMassG,
+        totalOutputG: targetMassG,
         lossG: 0,
         lossPct: 0,
         waterAdjustmentG: 0,
@@ -397,8 +431,10 @@ function FormulasListView() {
           <DialogHeader>
             <DialogTitle>New Formula</DialogTitle>
             <DialogDescription>
-              Create a new candidate formula. You can add ingredients in the
-              detail view.
+              Create a new candidate formula.
+              {(data.targetProduct.targetIngredients ?? []).length > 0
+                ? ` It will be pre-populated with the ${data.targetProduct.targetIngredients.length} ingredient${data.targetProduct.targetIngredients.length !== 1 ? "s" : ""} from your target ingredient order.`
+                : " You can add ingredients in the detail view."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

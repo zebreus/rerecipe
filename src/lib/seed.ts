@@ -34,6 +34,7 @@ export function createDefaultProjectData(): ProjectData {
         packaging: [],
       },
       targetNutrition: DEFAULT_TARGET_NUTRITION.map((n) => ({ ...n })),
+      targetIngredients: [],
     },
     ingredients: [],
     formulas: [],
@@ -89,6 +90,18 @@ export function createSeedData(): ProjectData {
       { name: "Protein", unit: "g", per100g: 3.5 },
       { name: "Fibre", unit: "g", per100g: 0.3 },
       { name: "Salt", unit: "g", per100g: 0.15 },
+    ],
+    // Ingredient order as listed on the product label (descending by mass%).
+    // Approximate percentages derived from the known formula composition.
+    targetIngredients: [
+      { ingredientId: "ing-1", targetPct: 65 },  // Whole Milk
+      { ingredientId: "ing-2", targetPct: 17.5 }, // Short Grain Rice
+      { ingredientId: "ing-3", targetPct: 7 },    // Granulated Sugar
+      { ingredientId: "ing-4", targetPct: 5 },    // Heavy Cream
+      { ingredientId: "ing-5", targetPct: 2 },    // Modified Starch
+      { ingredientId: "ing-6" },                   // Carrageenan (trace – no exact %)
+      { ingredientId: "ing-7" },                   // Vanilla Extract (trace – no exact %)
+      { ingredientId: "ing-8" },                   // Salt (trace – no exact %)
     ],
   };
 

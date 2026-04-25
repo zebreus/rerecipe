@@ -5,6 +5,7 @@ import type {
   MassBalance,
   Trial,
   TargetProduct,
+  TargetIngredient,
   Formula,
   NutritionalValue,
 } from "./types";
@@ -246,7 +247,123 @@ export function checkCompliance(
   };
 }
 
-// ─── Ranking Engine ───
+// ─── Ingredient Order Compliance ───
+// Checks how well a formula's ingredient composition matches the target
+// ingredient order and percentages.
+//
+// Warnings are emitted when:
+//  - A target ingredient is missing from the formula entirely.
+//  - An ingredient has a targetPct and the formula's actual mass% deviates
+//    by more than PCT_WARN_DIFF percentage points.
+//  - The ingredient ranking by mass% in the formula does not match the
+//    expected target order.
+
+export interface IngredientOrderIssue {
+  kind: "missing" | "pct-deviation" | "order-mismatch";
+  ingredientId: string;
+  ingredientName: string;
+  // For pct-deviation:
+  targetPct?: number;
+  formulaPct?: number;
+  // For order-mismatch: expected rank (1-based) vs actual rank
+  expectedRank?: number;
+  actualRank?: number;
+}
+
+export function checkIngredientOrderCompliance(
+  lines: FormulaLine[],
+  targetIngredients: TargetIngredient[],
+  ingredients: Ingredient[]
+): {
+  status: "ok" | "warning";
+  issues: IngredientOrderIssue[];
+} {
+  if (targetIngredients.length === 0) {
+    return { status: "ok", issues: [] };
+  }
+
+  const PCT_WARN_DIFF = 5; // percentage-point deviation threshold
+
+  const totalG = lines.reduce((s, l) => s + l.massG, 0);
+  const ingById = new Map<string, Ingredient>(ingredients.map((i) => [i.id, i]));
+
+  // Map formulaLine by ingredientId for quick lookup.
+  const lineByIngId = new Map<string, FormulaLine>(
+    lines.map((l) => [l.ingredientId, l])
+  );
+
+  const issues: IngredientOrderIssue[] = [];
+
+  // ── 1. Missing / percentage deviation ──
+  for (const ti of targetIngredients) {
+    const ing = ingById.get(ti.ingredientId);
+    const name = ing?.name ?? ti.ingredientId;
+    const line = lineByIngId.get(ti.ingredientId);
+
+    if (!line) {
+      issues.push({ kind: "missing", ingredientId: ti.ingredientId, ingredientName: name });
+      continue;
+    }
+
+    if (ti.targetPct !== undefined && totalG > 0) {
+      const formulaPct = round2((line.massG / totalG) * 100);
+      const diff = Math.abs(formulaPct - ti.targetPct);
+      if (diff > PCT_WARN_DIFF) {
+        issues.push({
+          kind: "pct-deviation",
+          ingredientId: ti.ingredientId,
+          ingredientName: name,
+          targetPct: ti.targetPct,
+          formulaPct,
+        });
+      }
+    }
+  }
+
+  // ── 2. Order mismatch ──
+  // Sort formula lines by descending mass (as on a label) and compare
+  // against the target ingredient order.
+  if (totalG > 0 && targetIngredients.length > 1) {
+    // Only consider target ingredients that are present in the formula.
+    const presentTargetIds = targetIngredients
+      .map((ti) => ti.ingredientId)
+      .filter((id) => lineByIngId.has(id));
+
+    // Actual order: target ingredient IDs sorted by descending mass in formula.
+    const actualOrder = [...presentTargetIds].sort((a, b) => {
+      const mA = lineByIngId.get(a)?.massG ?? 0;
+      const mB = lineByIngId.get(b)?.massG ?? 0;
+      return mB - mA;
+    });
+
+    for (let i = 0; i < presentTargetIds.length; i++) {
+      if (actualOrder[i] !== presentTargetIds[i]) {
+        const actualId = actualOrder[i];
+        const actualName = ingById.get(actualId)?.name ?? actualId;
+        // Report order mismatch for the ingredient that is out of place.
+        // To avoid duplicate reports, only report the first mismatch.
+        const alreadyReported = issues.some(
+          (iss) => iss.kind === "order-mismatch" && iss.ingredientId === actualId
+        );
+        if (!alreadyReported) {
+          issues.push({
+            kind: "order-mismatch",
+            ingredientId: actualId,
+            ingredientName: actualName,
+            expectedRank: presentTargetIds.indexOf(actualId) + 1,
+            actualRank: i + 1,
+          });
+        }
+        break; // report first mismatch only to keep noise low
+      }
+    }
+  }
+
+  return {
+    status: issues.length === 0 ? "ok" : "warning",
+    issues,
+  };
+}
 export function rankTrials(
   trials: Trial[],
   formulas: Formula[],
