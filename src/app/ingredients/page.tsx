@@ -49,6 +49,9 @@ import {
 
 import { COMMON_INGREDIENTS } from "@/lib/common-ingredients";
 
+const CONFIDENCE_TOOLTIP =
+  "How certain we are about the correctness of this ingredient's composition data. A higher value means the data is from a reliable source and has been verified.";
+
 export default function IngredientsPage() {
   const { data, addIngredient, updateIngredient, deleteIngredient } =
     useStore();
@@ -329,7 +332,7 @@ export default function IngredientsPage() {
                     {(selected.confidence * 100).toFixed(0)}%
                     <span
                       className="inline-flex items-center cursor-help text-gray-400 dark:text-gray-500"
-                      title="How certain we are about the correctness of this ingredient's composition data. A higher value means the data is from a reliable source and has been verified."
+                      title={CONFIDENCE_TOOLTIP}
                     >
                       <HelpCircle className="h-3.5 w-3.5" />
                     </span>
@@ -494,7 +497,7 @@ export default function IngredientsPage() {
                     Confidence (0–1)
                     <span
                       className="inline-flex items-center cursor-help text-gray-400 dark:text-gray-500"
-                      title="How certain we are about the correctness of this ingredient's composition data. A higher value means the data is from a reliable source and has been verified."
+                      title={CONFIDENCE_TOOLTIP}
                     >
                       <HelpCircle className="h-3.5 w-3.5" />
                     </span>
