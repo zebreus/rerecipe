@@ -27,16 +27,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2, Save, Lock, Unlock, Printer, TestTube, AlertTriangle, Play } from "lucide-react";
 import type { Formula, FormulaLine, Trial } from "@/lib/types";
+import { nutritionColor } from "@/lib/types";
 import {
-  COMPONENT_KEYS,
-  COMPONENT_LABELS,
-  COMPONENT_COLORS,
-} from "@/lib/types";
-import {
-  calculateFormulaComponents,
+  calculateFormulaNutrition,
   calculateMassBalance,
-  componentsToPercent,
-  compositionSimilarity,
+  nutritionSimilarity,
   ingredientContributions,
   sensitivityAnalysis,
   checkCompliance,
@@ -176,36 +171,34 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     });
   }
 
-  const comps = calculateFormulaComponents(local.ingredientLines, ingredients);
-  const mb = calculateMassBalance(local.ingredientLines, local.targetMassG);
-  const pct = componentsToPercent(comps);
-  const sim = compositionSimilarity(
-    pct,
-    data.targetProduct.targetComposition
+  const trackedNutrients = data.targetProduct.targetNutrition;
+  const calc = calculateFormulaNutrition(
+    local.ingredientLines,
+    ingredients,
+    trackedNutrients
   );
+  const mb = calculateMassBalance(local.ingredientLines, local.targetMassG);
+  const sim = nutritionSimilarity(calc, trackedNutrients);
   const contributions = ingredientContributions(
     local.ingredientLines,
-    ingredients
+    ingredients,
+    trackedNutrients
   );
 
-  // Heatmap data
-  const heatmapData = contributions.map((c) => ({
-    name: c.ingredientName,
-    Water: c.water,
-    Fat: c.fat,
-    Protein: c.protein,
-    Sugar: c.sugar,
-    Starch: c.starch,
-    Salt: c.salt,
-    Hydrocolloid: c.hydrocolloid,
-    Other: c.other,
-  }));
+  // Heatmap data — one row per ingredient line, with nutrient names as series.
+  const heatmapData = contributions.map((c) => {
+    const row: Record<string, number | string> = { name: c.ingredientName };
+    for (const n of trackedNutrients) {
+      row[n.name] = c.values[n.name] ?? 0;
+    }
+    return row;
+  });
 
   // Composition comparison
-  const compCompare = COMPONENT_KEYS.map((key) => ({
-    name: COMPONENT_LABELS[key],
-    Target: data.targetProduct.targetComposition[key],
-    Formula: pct[key],
+  const compCompare = trackedNutrients.map((n) => ({
+    name: n.name,
+    Target: n.per100g,
+    Formula: calc[n.name] ?? 0,
   }));
 
   // Sensitivity
@@ -214,6 +207,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
       ? sensitivityAnalysis(
           local,
           ingredients,
+          trackedNutrients,
           sensitivityIngId,
           sensitivityDelta
         )
@@ -471,33 +465,38 @@ export default function FormulaDetailClient({ id }: { id: string }) {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">
-                    Calculated Components
+                    Calculated Nutrition (per 100&nbsp;g)
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-1 text-sm">
-                  {COMPONENT_KEYS.map((key) => {
-                    const gKey = key.replace("_pct", "_g") as keyof typeof comps;
-                    const grams = comps[gKey] as number;
-                    return (
-                      <div key={key} className="flex justify-between">
+                  {trackedNutrients.length === 0 ? (
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      No nutritional values tracked. Configure them on the Target page.
+                    </p>
+                  ) : (
+                    trackedNutrients.map((n) => (
+                      <div key={n.name} className="flex justify-between">
                         <span className="flex items-center gap-1.5">
                           <span
                             className="w-2 h-2 rounded-full"
-                            style={{
-                              backgroundColor: COMPONENT_COLORS[key],
-                            }}
+                            style={{ backgroundColor: nutritionColor(n.name) }}
                           />
-                          {COMPONENT_LABELS[key]}
+                          {n.name}
                         </span>
                         <span>
-                          {grams.toFixed(1)} g ({pct[key].toFixed(1)}%)
+                          {(calc[n.name] ?? 0).toFixed(2)} {n.unit}
                         </span>
                       </div>
-                    );
-                  })}
+                    ))
+                  )}
                   <div className="flex justify-between border-t pt-1 font-medium">
-                    <span>Total</span>
-                    <span>{comps.total_g.toFixed(1)} g</span>
+                    <span>Total Mass</span>
+                    <span>
+                      {local.ingredientLines
+                        .reduce((s, l) => s + l.massG, 0)
+                        .toFixed(1)}{" "}
+                      g
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -539,14 +538,14 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                     />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="Water" stackId="a" fill={COMPONENT_COLORS.water_pct} />
-                    <Bar dataKey="Fat" stackId="a" fill={COMPONENT_COLORS.fat_pct} />
-                    <Bar dataKey="Protein" stackId="a" fill={COMPONENT_COLORS.protein_pct} />
-                    <Bar dataKey="Sugar" stackId="a" fill={COMPONENT_COLORS.sugar_pct} />
-                    <Bar dataKey="Starch" stackId="a" fill={COMPONENT_COLORS.starch_pct} />
-                    <Bar dataKey="Salt" stackId="a" fill={COMPONENT_COLORS.salt_pct} />
-                    <Bar dataKey="Hydrocolloid" stackId="a" fill={COMPONENT_COLORS.hydrocolloid_pct} />
-                    <Bar dataKey="Other" stackId="a" fill={COMPONENT_COLORS.other_pct} />
+                    {trackedNutrients.map((n) => (
+                      <Bar
+                        key={n.name}
+                        dataKey={n.name}
+                        stackId="a"
+                        fill={nutritionColor(n.name)}
+                      />
+                    ))}
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -634,30 +633,25 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b text-left text-gray-500 dark:text-gray-400">
-                        <th className="pb-2 font-medium">Component</th>
-                        <th className="pb-2 font-medium">Original (g)</th>
-                        <th className="pb-2 font-medium">Modified (g)</th>
-                        <th className="pb-2 font-medium">Delta (g)</th>
+                        <th className="pb-2 font-medium">Nutrient</th>
+                        <th className="pb-2 font-medium">Original</th>
+                        <th className="pb-2 font-medium">Modified</th>
+                        <th className="pb-2 font-medium">Delta</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {Object.entries(sensResult.deltas).map(([key, delta]) => {
-                        const origKey =
-                          key as keyof typeof sensResult.original;
+                      {trackedNutrients.map((n) => {
+                        const orig = sensResult.original[n.name] ?? 0;
+                        const mod = sensResult.modified[n.name] ?? 0;
+                        const delta = sensResult.deltas[n.name] ?? 0;
                         return (
-                          <tr key={key} className="border-b last:border-0">
+                          <tr key={n.name} className="border-b last:border-0">
+                            <td className="py-1.5">{n.name}</td>
                             <td className="py-1.5">
-                              {key.replace("_g", "")}
+                              {orig.toFixed(2)} {n.unit}
                             </td>
                             <td className="py-1.5">
-                              {(
-                                sensResult.original[origKey] as number
-                              ).toFixed(2)}
-                            </td>
-                            <td className="py-1.5">
-                              {(
-                                sensResult.modified[origKey] as number
-                              ).toFixed(2)}
+                              {mod.toFixed(2)} {n.unit}
                             </td>
                             <td
                               className={`py-1.5 font-medium ${
@@ -669,7 +663,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                               }`}
                             >
                               {delta > 0 ? "+" : ""}
-                              {delta.toFixed(2)}
+                              {delta.toFixed(2)} {n.unit}
                             </td>
                           </tr>
                         );
@@ -709,17 +703,17 @@ export default function FormulaDetailClient({ id }: { id: string }) {
               </CardHeader>
               <CardContent>
                 <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {COMPONENT_KEYS.map((key) => (
-                    <div key={key} className="flex justify-between py-2 text-sm">
+                  {trackedNutrients.map((n) => (
+                    <div key={n.name} className="flex justify-between py-2 text-sm">
                       <span className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300">
                         <span
                           className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: COMPONENT_COLORS[key] }}
+                          style={{ backgroundColor: nutritionColor(n.name) }}
                         />
-                        {COMPONENT_LABELS[key]}
+                        {n.name}
                       </span>
                       <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
-                        {pct[key].toFixed(1)}%
+                        {(calc[n.name] ?? 0).toFixed(2)} {n.unit}
                       </span>
                     </div>
                   ))}
@@ -729,7 +723,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
 
             {/* Section C: Compliance Status */}
             {(() => {
-              const compliance = checkCompliance(pct, data.targetProduct.targetComposition);
+              const compliance = checkCompliance(calc, trackedNutrients);
               const statusColor =
                 compliance.status === "compliant"
                   ? { bg: "#16a34a", text: "#ffffff" }
@@ -749,22 +743,21 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                         {compliance.status.replace("-", " ").toUpperCase()}
                       </Badge>
                       <span className="text-sm text-gray-500 dark:text-gray-400">
-                        Max deviation: {compliance.maxDeviation.toFixed(2)}%
+                        Max relative deviation: {compliance.maxRelDeviationPct.toFixed(1)}%
                       </span>
                     </div>
                     {compliance.deviations.length > 0 && (
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                          Deviations (&gt;2%)
+                          Deviations (&gt;10%)
                         </p>
                         <div className="divide-y divide-gray-200 dark:divide-gray-700">
                           {compliance.deviations.map((d) => (
-                            <div key={d.key} className="flex justify-between py-1.5 text-sm">
-                              <span className="text-gray-700 dark:text-gray-300">{d.label}</span>
+                            <div key={d.name} className="flex justify-between py-1.5 text-sm">
+                              <span className="text-gray-700 dark:text-gray-300">{d.name}</span>
                               <span className="text-red-600 dark:text-red-400 font-medium tabular-nums">
-                                {pct[d.key as keyof typeof pct].toFixed(1)}% vs{" "}
-                                {data.targetProduct.targetComposition[d.key as keyof typeof pct].toFixed(1)}%
-                                {" "}(Δ {d.diff.toFixed(2)}%)
+                                {d.formulaVal.toFixed(2)} {d.unit} vs {d.targetVal.toFixed(2)} {d.unit}
+                                {" "}(Δ {d.relDiffPct.toFixed(1)}%)
                               </span>
                             </div>
                           ))}
@@ -783,25 +776,31 @@ export default function FormulaDetailClient({ id }: { id: string }) {
               </CardHeader>
               <CardContent>
                 <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {COMPONENT_KEYS.map((key) => {
-                    const formulaVal = pct[key];
-                    const targetVal = data.targetProduct.targetComposition[key];
+                  {trackedNutrients.map((n) => {
+                    const formulaVal = calc[n.name] ?? 0;
+                    const targetVal = n.per100g;
                     const diff = formulaVal - targetVal;
-                    const absDiff = Math.abs(diff);
+                    const denom = Math.max(Math.abs(targetVal), Math.abs(formulaVal), 1e-3);
+                    const relDiffPct = (Math.abs(diff) / denom) * 100;
                     const colorClass =
-                      absDiff <= 2
+                      relDiffPct <= 10
                         ? "text-green-600 dark:text-green-400"
-                        : absDiff <= 5
+                        : relDiffPct <= 25
                         ? "text-yellow-600 dark:text-yellow-400"
                         : "text-red-600 dark:text-red-400";
                     return (
-                      <div key={key} className="flex justify-between py-2 text-sm">
-                        <span className="text-gray-700 dark:text-gray-300">{COMPONENT_LABELS[key]}</span>
+                      <div key={n.name} className="flex justify-between py-2 text-sm">
+                        <span className="text-gray-700 dark:text-gray-300">{n.name}</span>
                         <div className="flex gap-4 tabular-nums">
-                          <span className="text-gray-900 dark:text-gray-100">{formulaVal.toFixed(1)}%</span>
-                          <span className="text-gray-500 dark:text-gray-400">vs {targetVal.toFixed(1)}%</span>
+                          <span className="text-gray-900 dark:text-gray-100">
+                            {formulaVal.toFixed(2)} {n.unit}
+                          </span>
+                          <span className="text-gray-500 dark:text-gray-400">
+                            vs {targetVal.toFixed(2)} {n.unit}
+                          </span>
                           <span className={`font-medium ${colorClass}`}>
-                            {diff >= 0 ? "+" : ""}{diff.toFixed(1)}%
+                            {diff >= 0 ? "+" : ""}
+                            {diff.toFixed(2)} {n.unit}
                           </span>
                         </div>
                       </div>

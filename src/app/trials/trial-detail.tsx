@@ -32,9 +32,8 @@ import type {
   TrialMeasurement,
   ScoringDimension,
 } from "@/lib/types";
-import { COMPONENT_KEYS, COMPONENT_LABELS } from "@/lib/types";
 import { statusColor } from "@/lib/utils";
-import { calculateSimilarityScore, calculateFormulaComponents, componentsToPercent, checkCompliance } from "@/lib/solver";
+import { calculateSimilarityScore, calculateFormulaNutrition, checkCompliance } from "@/lib/solver";
 import {
   RadarChart,
   PolarGrid,
@@ -690,9 +689,13 @@ export default function TrialDetailClient({ id }: { id: string }) {
               </CardContent>
             </Card>
           ) : (() => {
-            const trialComps = calculateFormulaComponents(formula.ingredientLines, data.ingredients);
-            const trialPct = componentsToPercent(trialComps);
-            const compliance = checkCompliance(trialPct, data.targetProduct.targetComposition);
+            const trackedNutrients = data.targetProduct.targetNutrition;
+            const trialCalc = calculateFormulaNutrition(
+              formula.ingredientLines,
+              data.ingredients,
+              trackedNutrients
+            );
+            const compliance = checkCompliance(trialCalc, trackedNutrients);
             const significantDeviations = compliance.deviations.length;
 
             return (
@@ -723,10 +726,10 @@ export default function TrialDetailClient({ id }: { id: string }) {
                     <div className="grid grid-cols-2 gap-4 pt-2">
                       <div className="text-center">
                         <p className="text-xs text-gray-500 dark:text-gray-400">Max Deviation</p>
-                        <p className="text-xl font-bold">{compliance.maxDeviation.toFixed(1)}%</p>
+                        <p className="text-xl font-bold">{compliance.maxRelDeviationPct.toFixed(1)}%</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Components &gt; 2%</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Nutrients &gt; 10% off</p>
                         <p className="text-xl font-bold">{significantDeviations}</p>
                       </div>
                     </div>
@@ -741,39 +744,44 @@ export default function TrialDetailClient({ id }: { id: string }) {
                   <CardContent>
                     <div className="space-y-2">
                       <div className="grid grid-cols-5 gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 pb-1 border-b">
-                        <span>Component</span>
+                        <span>Nutrient</span>
                         <span className="text-right">Formula</span>
                         <span className="text-right">Target</span>
                         <span className="text-right">Diff</span>
                         <span className="text-right">Status</span>
                       </div>
-                      {COMPONENT_KEYS.map((key) => {
-                        const formulaVal = trialPct[key];
-                        const targetVal = data.targetProduct.targetComposition[key];
+                      {trackedNutrients.map((n) => {
+                        const formulaVal = trialCalc[n.name] ?? 0;
+                        const targetVal = n.per100g;
                         const diff = formulaVal - targetVal;
-                        const absDiff = Math.abs(diff);
+                        const denom = Math.max(
+                          Math.abs(targetVal),
+                          Math.abs(formulaVal),
+                          1e-3
+                        );
+                        const relDiffPct = (Math.abs(diff) / denom) * 100;
                         const direction = diff > 0 ? "over" : "under";
 
                         return (
-                          <div key={key} className="grid grid-cols-5 gap-2 text-sm items-center py-1">
-                            <span className="font-medium truncate">{COMPONENT_LABELS[key]}</span>
-                            <span className="text-right">{formulaVal.toFixed(1)}%</span>
-                            <span className="text-right">{targetVal.toFixed(1)}%</span>
+                          <div key={n.name} className="grid grid-cols-5 gap-2 text-sm items-center py-1">
+                            <span className="font-medium truncate">{n.name}</span>
+                            <span className="text-right">{formulaVal.toFixed(2)} {n.unit}</span>
+                            <span className="text-right">{targetVal.toFixed(2)} {n.unit}</span>
                             <span className="text-right">
-                              {diff >= 0 ? "+" : ""}{diff.toFixed(1)}%
+                              {diff >= 0 ? "+" : ""}{diff.toFixed(2)} {n.unit}
                             </span>
                             <span className="text-right">
-                              {absDiff <= 2 ? (
+                              {relDiffPct <= 10 ? (
                                 <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
                                   OK
                                 </Badge>
-                              ) : absDiff <= 5 ? (
+                              ) : relDiffPct <= 25 ? (
                                 <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-xs">
-                                  {absDiff.toFixed(1)}% {direction}
+                                  {relDiffPct.toFixed(1)}% {direction}
                                 </Badge>
                               ) : (
                                 <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs">
-                                  {absDiff.toFixed(1)}% {direction}
+                                  {relDiffPct.toFixed(1)}% {direction}
                                 </Badge>
                               )}
                             </span>

@@ -6,17 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import {
-  calculateFormulaComponents,
-  componentsToPercent,
+  calculateFormulaNutrition,
   calculateSimilarityScore,
   rankTrials,
-  compositionSimilarity,
+  nutritionSimilarity,
   checkCompliance,
 } from "@/lib/solver";
-import {
-  COMPONENT_KEYS,
-  COMPONENT_LABELS,
-} from "@/lib/types";
 import {
   BarChart,
   Bar,
@@ -86,16 +81,18 @@ export default function AnalysisPage() {
     }));
 
   // ─── Formula composition comparison ───
-  const formulaCompData = COMPONENT_KEYS.map((key) => {
+  const formulaCompData = targetProduct.targetNutrition.map((n) => {
     const row: Record<string, number | string> = {
-      name: COMPONENT_LABELS[key],
-      Target: targetProduct.targetComposition[key],
+      name: n.name,
+      Target: n.per100g,
     };
     formulas.forEach((f) => {
-      const pct = componentsToPercent(
-        calculateFormulaComponents(f.ingredientLines, ingredients)
+      const calc = calculateFormulaNutrition(
+        f.ingredientLines,
+        ingredients,
+        targetProduct.targetNutrition
       );
-      row[f.name] = pct[key];
+      row[f.name] = calc[n.name] ?? 0;
     });
     return row;
   });
@@ -145,26 +142,27 @@ export default function AnalysisPage() {
       return reasons;
     }
 
-    const comps = calculateFormulaComponents(
+    const calc = calculateFormulaNutrition(
       bestFormula.ingredientLines,
-      ingredients
+      ingredients,
+      targetProduct.targetNutrition
     );
-    const pct = componentsToPercent(comps);
 
-    // Check each component gap
-    for (const key of COMPONENT_KEYS) {
-      const target = targetProduct.targetComposition[key];
-      const actual = pct[key];
+    // Check each tracked nutrient gap (relative deviation > 10%)
+    for (const n of targetProduct.targetNutrition) {
+      const target = n.per100g;
+      const actual = calc[n.name] ?? 0;
       const diff = actual - target;
-      const label = COMPONENT_LABELS[key];
-      if (Math.abs(diff) > 2) {
+      const denom = Math.max(Math.abs(target), Math.abs(actual), 1e-3);
+      const relDiffPct = (Math.abs(diff) / denom) * 100;
+      if (relDiffPct > 10) {
         if (diff > 0) {
           reasons.push(
-            `${label} is ${diff.toFixed(1)}% over target. Consider reducing ${label.toLowerCase()}-contributing ingredients.`
+            `${n.name} is ${diff.toFixed(2)} ${n.unit} over target. Consider reducing ${n.name.toLowerCase()}-contributing ingredients.`
           );
         } else {
           reasons.push(
-            `${label} is ${Math.abs(diff).toFixed(1)}% under target. Consider increasing ${label.toLowerCase()}-contributing ingredients.`
+            `${n.name} is ${Math.abs(diff).toFixed(2)} ${n.unit} under target. Consider increasing ${n.name.toLowerCase()}-contributing ingredients.`
           );
         }
       }
@@ -420,29 +418,41 @@ export default function AnalysisPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {COMPONENT_KEYS.map((key) => (
-                        <tr key={key} className="border-b last:border-0">
-                          <td className="py-1.5 font-medium">{COMPONENT_LABELS[key]}</td>
-                          <td className="py-1.5">{targetProduct.targetComposition[key].toFixed(1)}%</td>
+                      {targetProduct.targetNutrition.map((n) => (
+                        <tr key={n.name} className="border-b last:border-0">
+                          <td className="py-1.5 font-medium">{n.name}</td>
+                          <td className="py-1.5">
+                            {n.per100g.toFixed(2)} {n.unit}
+                          </td>
                           {formulas.map((f) => {
-                            const pct = componentsToPercent(
-                              calculateFormulaComponents(f.ingredientLines, ingredients)
+                            const calc = calculateFormulaNutrition(
+                              f.ingredientLines,
+                              ingredients,
+                              targetProduct.targetNutrition
                             );
-                            const diff = pct[key] - targetProduct.targetComposition[key];
+                            const formulaVal = calc[n.name] ?? 0;
+                            const diff = formulaVal - n.per100g;
+                            const denom = Math.max(
+                              Math.abs(n.per100g),
+                              Math.abs(formulaVal),
+                              1e-3
+                            );
+                            const relDiffPct = (Math.abs(diff) / denom) * 100;
                             return (
                               <td
                                 key={f.id}
                                 className={`py-1.5 ${
-                                  Math.abs(diff) > 5
+                                  relDiffPct > 25
                                     ? "text-red-600 dark:text-red-400 font-medium"
-                                    : Math.abs(diff) > 2
+                                    : relDiffPct > 10
                                     ? "text-yellow-600 dark:text-yellow-400"
                                     : "text-green-600 dark:text-green-400"
                                 }`}
                               >
-                                {pct[key].toFixed(1)}%
+                                {formulaVal.toFixed(2)} {n.unit}
                                 <span className="text-xs ml-1">
-                                  ({diff > 0 ? "+" : ""}{diff.toFixed(1)})
+                                  ({diff > 0 ? "+" : ""}
+                                  {diff.toFixed(2)})
                                 </span>
                               </td>
                             );
@@ -453,10 +463,15 @@ export default function AnalysisPage() {
                         <td className="py-1.5">Match Score</td>
                         <td className="py-1.5">—</td>
                         {formulas.map((f) => {
-                          const pct = componentsToPercent(
-                            calculateFormulaComponents(f.ingredientLines, ingredients)
+                          const calc = calculateFormulaNutrition(
+                            f.ingredientLines,
+                            ingredients,
+                            targetProduct.targetNutrition
                           );
-                          const sim = compositionSimilarity(pct, targetProduct.targetComposition);
+                          const sim = nutritionSimilarity(
+                            calc,
+                            targetProduct.targetNutrition
+                          );
                           return (
                             <td key={f.id} className="py-1.5">{sim.toFixed(1)}%</td>
                           );
@@ -484,10 +499,15 @@ export default function AnalysisPage() {
               ) : (
                 <div className="space-y-4">
                   {formulas.map((f) => {
-                    const pct = componentsToPercent(
-                      calculateFormulaComponents(f.ingredientLines, ingredients)
+                    const calc = calculateFormulaNutrition(
+                      f.ingredientLines,
+                      ingredients,
+                      targetProduct.targetNutrition
                     );
-                    const compliance = checkCompliance(pct, targetProduct.targetComposition);
+                    const compliance = checkCompliance(
+                      calc,
+                      targetProduct.targetNutrition
+                    );
                     return (
                       <div key={f.id} className="border rounded-lg p-4">
                         <div className="flex items-center justify-between mb-2">
@@ -506,16 +526,17 @@ export default function AnalysisPage() {
                               : compliance.status === "warning"
                               ? "⚠ Warning"
                               : "✗ Non-compliant"}
-                            {" (max deviation: "}
-                            {compliance.maxDeviation.toFixed(1)}%)
+                            {" (max relative deviation: "}
+                            {compliance.maxRelDeviationPct.toFixed(1)}%)
                           </span>
                         </div>
                         {compliance.deviations.length > 0 && (
                           <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
                             {compliance.deviations.map((d) => (
-                              <li key={d.key} className="flex gap-2">
-                                <span className={d.diff > 5 ? "text-red-500" : "text-yellow-500"}>●</span>
-                                {d.label}: {d.diff.toFixed(1)}% deviation from target
+                              <li key={d.name} className="flex gap-2">
+                                <span className={d.relDiffPct > 25 ? "text-red-500" : "text-yellow-500"}>●</span>
+                                {d.name}: {d.formulaVal.toFixed(2)} {d.unit} vs {d.targetVal.toFixed(2)} {d.unit}
+                                {" "}({d.relDiffPct.toFixed(1)}% rel.)
                               </li>
                             ))}
                           </ul>

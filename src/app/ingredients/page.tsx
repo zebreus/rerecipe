@@ -25,11 +25,8 @@ import {
 } from "@/components/ui/select";
 import {
   type Ingredient,
-  COMPONENT_KEYS,
-  COMPONENT_LABELS,
-  COMPONENT_COLORS,
   INGREDIENT_CATEGORIES,
-  EMPTY_COMPOSITION,
+  nutritionColor,
 } from "@/lib/types";
 import { generateId } from "@/lib/utils";
 import { Plus, Pencil, Trash2, Search, Leaf, Zap, HelpCircle } from "lucide-react";
@@ -47,7 +44,7 @@ import {
   Cell,
 } from "recharts";
 
-import { COMMON_INGREDIENTS } from "@/lib/common-ingredients";
+import { COMMON_INGREDIENTS, emptyNutrition, presetNutrition } from "@/lib/common-ingredients";
 
 const CONFIDENCE_TOOLTIP =
   "How certain we are about the correctness of this ingredient's composition data. A higher value means the data is from a reliable source and has been verified.";
@@ -93,6 +90,9 @@ export default function IngredientsPage() {
   const [quickAddSearch, setQuickAddSearch] = useState("");
   const [quickAddCategory, setQuickAddCategory] = useState("all");
 
+  const trackedNutrients = data.targetProduct.targetNutrition;
+  const trackedNames = trackedNutrients.map((n) => n.name);
+
   const filtered = data.ingredients.filter((ing) => {
     const matchesSearch =
       ing.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -112,7 +112,7 @@ export default function IngredientsPage() {
       name: "",
       category: "Other",
       density_g_ml: 1.0,
-      composition: { ...EMPTY_COMPOSITION },
+      nutrition: emptyNutrition(trackedNames),
       source: "",
       confidence: 0.9,
       costPerKg: 0,
@@ -126,7 +126,13 @@ export default function IngredientsPage() {
   }
 
   function openEdit(ing: Ingredient) {
-    setEditing({ ...ing });
+    // Ensure the editing object has entries for every tracked nutrient
+    // so the form renders inputs for them (existing extra entries are kept).
+    const nutrition = { ...ing.nutrition };
+    for (const name of trackedNames) {
+      if (typeof nutrition[name] !== "number") nutrition[name] = 0;
+    }
+    setEditing({ ...ing, nutrition });
     setDialogOpen(true);
   }
 
@@ -160,11 +166,15 @@ export default function IngredientsPage() {
     }
   }
 
+  // Show up to 4 tracked nutrients in the summary table for a quick overview.
+  const summaryNutrients = trackedNutrients.slice(0, 4);
+
   const selectedCompositionData = selected
-    ? COMPONENT_KEYS.map((key) => ({
-        name: COMPONENT_LABELS[key],
-        value: selected.composition[key],
-        color: COMPONENT_COLORS[key],
+    ? trackedNutrients.map((n) => ({
+        name: n.name,
+        value: selected.nutrition?.[n.name] ?? 0,
+        color: nutritionColor(n.name),
+        unit: n.unit,
       }))
     : [];
 
@@ -249,10 +259,11 @@ export default function IngredientsPage() {
                         {settings.showCostColumn && (
                           <th className="pb-2 font-medium">Cost</th>
                         )}
-                        <th className="pb-2 font-medium">Water</th>
-                        <th className="pb-2 font-medium">Fat</th>
-                        <th className="pb-2 font-medium">Protein</th>
-                        <th className="pb-2 font-medium">Sugar</th>
+                        {summaryNutrients.map((n) => (
+                          <th key={n.name} className="pb-2 font-medium">
+                            {n.name}
+                          </th>
+                        ))}
                         <th className="pb-2 font-medium"></th>
                       </tr>
                     </thead>
@@ -281,18 +292,14 @@ export default function IngredientsPage() {
                               {ing.costPerKg ? `$${ing.costPerKg.toFixed(2)}/kg` : "—"}
                             </td>
                           )}
-                          <td className="py-2">
-                            {ing.composition.water_pct}%
-                          </td>
-                          <td className="py-2">
-                            {ing.composition.fat_pct}%
-                          </td>
-                          <td className="py-2">
-                            {ing.composition.protein_pct}%
-                          </td>
-                          <td className="py-2">
-                            {ing.composition.sugar_pct}%
-                          </td>
+                          {summaryNutrients.map((n) => (
+                            <td key={n.name} className="py-2">
+                              {(ing.nutrition?.[n.name] ?? 0)}{" "}
+                              <span className="text-xs text-gray-400 dark:text-gray-500">
+                                {n.unit}
+                              </span>
+                            </td>
+                          ))}
                           <td className="py-2">
                             <div className="flex gap-1">
                               <Button
@@ -369,52 +376,60 @@ export default function IngredientsPage() {
 
                 <div>
                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-                    Composition
+                    Nutrition (per 100&nbsp;g)
                   </p>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart
-                      data={selectedCompositionData}
-                      layout="vertical"
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        type="number"
-                        domain={[0, 100]}
-                        tick={{ fontSize: 9 }}
-                      />
-                      <YAxis
-                        type="category"
-                        dataKey="name"
-                        width={70}
-                        tick={{ fontSize: 9 }}
-                      />
-                      <Tooltip />
-                      <Bar
-                        dataKey="value"
-                        name="%"
-                        radius={[0, 3, 3, 0]}
-                      >
-                        {selectedCompositionData.map((entry, index) => (
-                          <Cell key={index} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {selectedCompositionData.length === 0 ? (
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      No nutritional values tracked. Add some on the Target page.
+                    </p>
+                  ) : (
+                    <>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart
+                          data={selectedCompositionData}
+                          layout="vertical"
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" tick={{ fontSize: 9 }} />
+                          <YAxis
+                            type="category"
+                            dataKey="name"
+                            width={70}
+                            tick={{ fontSize: 9 }}
+                          />
+                          <Tooltip />
+                          <Bar
+                            dataKey="value"
+                            name="per 100 g"
+                            radius={[0, 3, 3, 0]}
+                          >
+                            {selectedCompositionData.map((entry, index) => (
+                              <Cell key={index} fill={entry.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
 
-                  <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    {COMPONENT_KEYS.map((key) => {
-                      const val = selected.composition[key];
-                      if (val === 0) return null;
-                      return (
-                        <div key={key} className="flex justify-between">
-                          <span className="text-gray-500 dark:text-gray-400">
-                            {COMPONENT_LABELS[key]}
-                          </span>
-                          <span className="font-medium">{val}%</span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        {selectedCompositionData.map((entry) => {
+                          if (entry.value === 0) return null;
+                          return (
+                            <div
+                              key={entry.name}
+                              className="flex justify-between"
+                            >
+                              <span className="text-gray-500 dark:text-gray-400">
+                                {entry.name}
+                              </span>
+                              <span className="font-medium">
+                                {entry.value} {entry.unit}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {selected.notes && (
@@ -536,40 +551,39 @@ export default function IngredientsPage() {
               </div>
 
               <div>
-                <p className="text-sm font-medium mb-2">Composition (%)</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {COMPONENT_KEYS.map((key) => (
-                    <div key={key} className="space-y-1">
-                      <Label className="text-xs">
-                        {COMPONENT_LABELS[key]}
-                      </Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="100"
-                        value={editing.composition[key]}
-                        onChange={(e) =>
-                          setEditing({
-                            ...editing,
-                            composition: {
-                              ...editing.composition,
-                              [key]: Math.max(0, Math.min(100, Number(e.target.value))),
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                  Total:{" "}
-                  {COMPONENT_KEYS.reduce(
-                    (s, k) => s + editing.composition[k],
-                    0
-                  ).toFixed(1)}
-                  %
+                <p className="text-sm font-medium mb-2">
+                  Nutrition (per 100&nbsp;g)
                 </p>
+                {trackedNutrients.length === 0 ? (
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    No nutritional values are tracked. Add some on the Target page.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {trackedNutrients.map((n) => (
+                      <div key={n.name} className="space-y-1">
+                        <Label className="text-xs">
+                          {n.name} ({n.unit})
+                        </Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={editing.nutrition?.[n.name] ?? 0}
+                          onChange={(e) =>
+                            setEditing({
+                              ...editing,
+                              nutrition: {
+                                ...editing.nutrition,
+                                [n.name]: Math.max(0, Number(e.target.value)),
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -673,7 +687,7 @@ export default function IngredientsPage() {
                         name: item.name,
                         category: item.category,
                         density_g_ml: item.density_g_ml,
-                        composition: { ...item.composition },
+                        nutrition: presetNutrition(item),
                         source: "",
                         confidence: 0.9,
                         costPerKg: item.costPerKg,

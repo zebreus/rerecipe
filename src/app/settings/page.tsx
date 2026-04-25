@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { generateId, exportFilename, describeImportError } from "@/lib/utils";
 import type { ScoringProfile, Ingredient } from "@/lib/types";
-import { COMPONENT_KEYS, COMPONENT_LABELS } from "@/lib/types";
 import { isUnmodifiedCommonIngredient } from "@/lib/common-ingredients";
 
 export default function SettingsPage() {
@@ -163,14 +162,13 @@ export default function SettingsPage() {
       lines.push(`- **Confidence:** ${(ing.confidence * 100).toFixed(0)}%`);
       if (ing.source) lines.push(`- **Source:** ${escapeMdInline(ing.source)}`);
       lines.push("");
-      lines.push("### Composition");
+      lines.push("### Nutrition (per 100 g)");
       lines.push("");
-      lines.push("| Component | % |");
-      lines.push("|-----------|---|");
-      for (const key of COMPONENT_KEYS) {
-        const val = ing.composition[key];
+      lines.push("| Nutrient | Value |");
+      lines.push("|----------|-------|");
+      for (const [name, val] of Object.entries(ing.nutrition ?? {})) {
         if (val !== 0) {
-          lines.push(`| ${escapeMdTableCell(COMPONENT_LABELS[key])} | ${val} |`);
+          lines.push(`| ${escapeMdTableCell(name)} | ${val} |`);
         }
       }
       if (ing.notes) {
