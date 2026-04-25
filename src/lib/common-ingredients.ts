@@ -285,7 +285,7 @@ export function presetNutrition(item: CommonIngredient): Record<string, number> 
 
 /** Fresh, blank ingredient nutrition record matching the given names. */
 export function emptyNutrition(names: string[]): Ingredient["nutrition"] {
-  const r: Record<string, number> = {};
-  for (const n of names) r[n] = 0;
-  return r;
+  const nutrition: Record<string, number> = {};
+  for (const name of names) nutrition[name] = 0;
+  return nutrition;
 }

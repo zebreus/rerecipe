@@ -35,6 +35,7 @@ import {
   ingredientContributions,
   sensitivityAnalysis,
   checkCompliance,
+  totalFormulaMassG,
 } from "@/lib/solver";
 import { Badge } from "@/components/ui/badge";
 import { generateId, statusColor } from "@/lib/utils";
@@ -492,10 +493,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                   <div className="flex justify-between border-t pt-1 font-medium">
                     <span>Total Mass</span>
                     <span>
-                      {local.ingredientLines
-                        .reduce((s, l) => s + l.massG, 0)
-                        .toFixed(1)}{" "}
-                      g
+                      {totalFormulaMassG(local.ingredientLines).toFixed(1)} g
                     </span>
                   </div>
                 </CardContent>
