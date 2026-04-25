@@ -36,7 +36,7 @@ import {
   AlertTriangle,
   Play,
 } from "lucide-react";
-import type { Protocol, ProtocolStep, Trial } from "@/lib/types";
+import type { Protocol, ProtocolStep, ProtocolContainer, ContainerType, Trial } from "@/lib/types";
 import { generateId, statusColor } from "@/lib/utils";
 import {
   BarChart,
@@ -129,6 +129,8 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
       completedAt: "",
       createdAt: now,
       updatedAt: now,
+      stepLogs: [],
+      containerStates: [],
     };
     addTrial(t);
     setTrialDialogOpen(false);
@@ -156,12 +158,14 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
       order: local!.steps.length + 1,
       name: "",
       description: "",
+      containerId: null,
       temperatureC: null,
-      durationMin: null,
-      agitationLevel: "none",
-      additionIngredients: [],
+      duration: { type: "fixed" },
+      containerAgitation: {},
+      additions: [],
       holdConditions: "",
       expectedEffects: [],
+      requiresStartConfirmation: false,
     };
     update({ steps: [...local!.steps, newStep] });
   }
@@ -188,14 +192,63 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
     update({ steps: steps.map((s, i) => ({ ...s, order: i + 1 })) });
   }
 
+  // ─── Container helpers ───
+  function addContainer() {
+    const newContainer: ProtocolContainer = {
+      id: generateId(),
+      name: "",
+      type: "pot",
+    };
+    update({ containers: [...(local!.containers || []), newContainer] });
+  }
+
+  function updateContainer(index: number, partial: Partial<ProtocolContainer>) {
+    const containers = (local!.containers || []).map((c, i) =>
+      i === index ? { ...c, ...partial } : c
+    );
+    update({ containers });
+  }
+
+  function removeContainer(index: number) {
+    const containerToRemove = (local!.containers || [])[index];
+    if (!containerToRemove) return;
+
+    const containers = (local!.containers || []).filter((_, i) => i !== index);
+    const steps = local!.steps.map((step) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { [containerToRemove.id]: _removedAgitation, ...remainingAgitation } =
+        step.containerAgitation || {};
+      return {
+        ...step,
+        containerId:
+          step.containerId === containerToRemove.id ? null : step.containerId,
+        containerAgitation: remainingAgitation,
+        additions: (step.additions || []).map((addition) => ({
+          ...addition,
+          containerId:
+            addition.containerId === containerToRemove.id
+              ? undefined
+              : addition.containerId,
+        })),
+      };
+    });
+    update({ containers, steps });
+  }
+
   // Timeline chart data
   const timelineData = local.steps
-    .filter((s) => s.durationMin != null)
-    .map((s) => ({
-      name: s.name || `Step ${s.order}`,
-      duration: Math.round((s.durationMin || 0) * scaleFactor * 10) / 10,
-      temp: s.temperatureC || 0,
-    }));
+    .filter((s) => {
+      const dur = s.duration?.durationMin ?? s.durationMin;
+      return dur != null;
+    })
+    .map((s) => {
+      const dur = s.duration?.durationMin ?? s.durationMin ?? 0;
+      return {
+        name: s.name || `Step ${s.order}`,
+        duration: Math.round(dur * scaleFactor * 10) / 10,
+        temp: s.temperatureC || 0,
+      };
+    });
 
   return (
     <div className="space-y-6">
@@ -355,6 +408,71 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
         </Card>
       )}
 
+      {/* Containers section */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-base">Containers</CardTitle>
+          <Button size="sm" variant="outline" onClick={addContainer}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add Container
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(local.containers || []).length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
+              No containers defined. Add containers to enable per-container settings in steps.
+            </p>
+          ) : (
+            (local.containers || []).map((container, idx) => (
+              <div key={container.id} className="flex items-center gap-2 border rounded p-3 bg-gray-50 dark:bg-gray-900">
+                <Input
+                  placeholder="Container name"
+                  className="flex-1 h-8"
+                  value={container.name}
+                  onChange={(e) => updateContainer(idx, { name: e.target.value })}
+                />
+                <Select
+                  value={container.type}
+                  onValueChange={(v) => updateContainer(idx, { type: v as ContainerType })}
+                >
+                  <SelectTrigger className="w-40 h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pot">Pot</SelectItem>
+                    <SelectItem value="bowl">Bowl</SelectItem>
+                    <SelectItem value="jar">Jar</SelectItem>
+                    <SelectItem value="pitcher">Pitcher</SelectItem>
+                    <SelectItem value="pressure-cooker">Pressure Cooker</SelectItem>
+                    <SelectItem value="pan">Pan</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  placeholder="Capacity (ml)"
+                  className="w-32 h-8"
+                  value={container.capacityMl ?? ""}
+                  onChange={(e) =>
+                    updateContainer(idx, {
+                      capacityMl: e.target.value ? Number(e.target.value) : undefined,
+                    })
+                  }
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-red-500 dark:text-red-400"
+                  onClick={() => removeContainer(idx)}
+                  aria-label={`Remove container ${container.name || idx + 1}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
       {/* Steps editor */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -369,143 +487,297 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
               No steps yet. Add your first process step.
             </p>
           ) : (
-            local.steps.map((step, idx) => (
-              <div
-                key={step.id}
-                className="border rounded-lg p-4 space-y-3 bg-gray-50 dark:bg-gray-900"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-gray-400 dark:text-gray-500 w-6">
-                    #{step.order}
-                  </span>
-                  <Input
-                    placeholder="Step name"
-                    className="flex-1 h-8 font-medium"
-                    value={step.name}
-                    onChange={(e) =>
-                      updateStep(idx, { name: e.target.value })
-                    }
-                  />
-                  <div className="flex gap-0.5">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      disabled={idx === 0}
-                      onClick={() => moveStep(idx, "up")}
-                      aria-label={`Move step ${step.name || idx + 1} up`}
-                    >
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      disabled={idx === local.steps.length - 1}
-                      onClick={() => moveStep(idx, "down")}
-                      aria-label={`Move step ${step.name || idx + 1} down`}
-                    >
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-red-500 dark:text-red-400"
-                      onClick={() => removeStep(idx)}
-                      aria-label={`Remove step ${step.name || idx + 1}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
+            local.steps.map((step, idx) => {
+              const containers = local.containers || [];
+              const durType = step.duration?.type ?? "fixed";
+              const durMin = step.duration?.durationMin ?? step.durationMin;
+              const eventDesc = step.duration?.eventDescription ?? "";
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Temp (°C)</Label>
+              return (
+                <div
+                  key={step.id}
+                  className="border rounded-lg p-4 space-y-3 bg-gray-50 dark:bg-gray-900"
+                >
+                  {/* Step header: number, name, move/delete */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-gray-400 dark:text-gray-500 w-6">
+                      #{step.order}
+                    </span>
                     <Input
-                      type="number"
-                      className="h-8"
-                      value={step.temperatureC ?? ""}
-                      onChange={(e) =>
-                        updateStep(idx, {
-                          temperatureC: e.target.value
-                            ? Number(e.target.value)
-                            : null,
-                        })
-                      }
+                      placeholder="Step name"
+                      className="flex-1 h-8 font-medium"
+                      value={step.name}
+                      onChange={(e) => updateStep(idx, { name: e.target.value })}
                     />
+                    <div className="flex gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        disabled={idx === 0}
+                        onClick={() => moveStep(idx, "up")}
+                        aria-label={`Move step ${step.name || idx + 1} up`}
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        disabled={idx === local.steps.length - 1}
+                        onClick={() => moveStep(idx, "down")}
+                        aria-label={`Move step ${step.name || idx + 1} down`}
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-500 dark:text-red-400"
+                        onClick={() => removeStep(idx)}
+                        aria-label={`Remove step ${step.name || idx + 1}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Duration (min)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      className="h-8"
-                      value={step.durationMin ?? ""}
-                      onChange={(e) =>
-                        updateStep(idx, {
-                          durationMin: e.target.value
-                            ? Math.max(0, Number(e.target.value))
-                            : null,
-                        })
-                      }
-                    />
-                    {scaleFactor !== 1 && step.durationMin != null && (
-                      <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
-                        → {Math.round(step.durationMin * scaleFactor * 10) / 10} min at {scaleFactor}×
+
+                  {/* Primary container + temperature */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Primary Container</Label>
+                      <Select
+                        value={step.containerId ?? "__none__"}
+                        onValueChange={(v) =>
+                          updateStep(idx, { containerId: v === "__none__" ? null : v })
+                        }
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {containers.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name || `Container ${c.id}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Target Temp °C</Label>
+                      <Input
+                        type="number"
+                        className="h-8"
+                        value={step.temperatureC ?? ""}
+                        onChange={(e) =>
+                          updateStep(idx, {
+                            temperatureC: e.target.value ? Number(e.target.value) : null,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* Duration section */}
+                  <div className="space-y-2">
+                    <Label className="text-xs">Duration Type</Label>
+                    <div className="flex gap-3">
+                      {(["fixed", "after-event", "user-confirm"] as const).map((t) => (
+                        <label key={t} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                          <input
+                            type="radio"
+                            name={`dur-type-${step.id}`}
+                            value={t}
+                            checked={durType === t}
+                            onChange={() =>
+                              updateStep(idx, {
+                                duration: {
+                                  ...step.duration,
+                                  type: t,
+                                },
+                              })
+                            }
+                          />
+                          {t === "fixed" ? "Fixed Time" : t === "after-event" ? "After Event" : "User Confirm"}
+                        </label>
+                      ))}
+                    </div>
+                    {durType === "fixed" && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Duration (min)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          className="h-8 w-32"
+                          value={durMin ?? ""}
+                          onChange={(e) =>
+                            updateStep(idx, {
+                              duration: {
+                                ...step.duration,
+                                type: "fixed",
+                                durationMin: e.target.value ? Math.max(0, Number(e.target.value)) : undefined,
+                              },
+                            })
+                          }
+                        />
+                        {scaleFactor !== 1 && durMin != null && (
+                          <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
+                            → {Math.round(durMin * scaleFactor * 10) / 10} min at {scaleFactor}×
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {durType === "after-event" && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Event Description</Label>
+                          <Input
+                            className="h-8"
+                            placeholder="e.g. pot reaches 85°C"
+                            value={eventDesc}
+                            onChange={(e) =>
+                              updateStep(idx, {
+                                duration: {
+                                  ...step.duration,
+                                  type: "after-event",
+                                  eventDescription: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Wait after event (min)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            className="h-8"
+                            value={durMin ?? ""}
+                            onChange={(e) =>
+                              updateStep(idx, {
+                                duration: {
+                                  ...step.duration,
+                                  type: "after-event",
+                                  durationMin: e.target.value ? Math.max(0, Number(e.target.value)) : undefined,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {durType === "user-confirm" && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                        User advances manually — no timer.
                       </p>
                     )}
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Agitation</Label>
-                    <Select
-                      value={step.agitationLevel}
-                      onValueChange={(v) =>
-                        updateStep(idx, {
-                          agitationLevel: v as ProtocolStep["agitationLevel"],
-                        })
-                      }
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Additions</Label>
-                    {step.additionIngredients.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-1">
-                        {step.additionIngredients.map((ingId) => {
-                          const ing = ingredientById.get(ingId);
-                          const ingName = ing?.name || ingId;
+
+                  {/* Per-container agitation */}
+                  {containers.length > 0 && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Container Agitation</Label>
+                      <div className="space-y-1">
+                        {containers.map((c) => {
+                          const agit = step.containerAgitation?.[c.id] ?? "none";
                           return (
-                            <span
-                              key={ingId}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 text-xs"
-                            >
-                              {ingName}
-                              <button
-                                type="button"
-                                aria-label={`Remove ${ingName}`}
-                                className="hover:text-red-500 dark:hover:text-red-400"
-                                onClick={() =>
+                            <div key={c.id} className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500 dark:text-gray-400 w-28 truncate">
+                                {c.name || c.id}
+                              </span>
+                              <Select
+                                value={agit}
+                                onValueChange={(v) =>
                                   updateStep(idx, {
-                                    additionIngredients:
-                                      step.additionIngredients.filter(
-                                        (id) => id !== ingId
-                                      ),
+                                    containerAgitation: {
+                                      ...step.containerAgitation,
+                                      [c.id]: v as "none" | "low" | "medium" | "high",
+                                    },
                                   })
                                 }
                               >
+                                <SelectTrigger className="h-7 w-28">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">None</SelectItem>
+                                  <SelectItem value="low">Low</SelectItem>
+                                  <SelectItem value="medium">Medium</SelectItem>
+                                  <SelectItem value="high">High</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ingredient additions */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Ingredient Additions</Label>
+                    {(step.additions || []).length > 0 && (
+                      <div className="space-y-1 mb-1">
+                        {(step.additions || []).map((addition, addIdx) => {
+                          const ing = ingredientById.get(addition.ingredientId);
+                          const cont = containers.find((c) => c.id === addition.containerId);
+                          return (
+                            <div key={addIdx} className="flex items-center gap-2 text-xs">
+                              <span className="flex-1 text-gray-700 dark:text-gray-300">
+                                {ing?.name || addition.ingredientId}
+                              </span>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                className="h-7 w-20 text-xs"
+                                value={addition.massG}
+                                onChange={(e) => {
+                                  const additions = (step.additions || []).map((a, ai) =>
+                                    ai === addIdx ? { ...a, massG: Number(e.target.value) } : a
+                                  );
+                                  updateStep(idx, { additions });
+                                }}
+                              />
+                              <span className="text-gray-400">g</span>
+                              <Select
+                                value={containers.some((c) => c.id === addition.containerId) ? addition.containerId : undefined}
+                                onValueChange={(v) => {
+                                  const additions = (step.additions || []).map((a, ai) =>
+                                    ai === addIdx ? { ...a, containerId: v } : a
+                                  );
+                                  updateStep(idx, { additions });
+                                }}
+                                disabled={containers.length === 0}
+                              >
+                                <SelectTrigger className="h-7 w-28">
+                                  <SelectValue placeholder={containers.length === 0 ? "No containers" : "Container"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {containers.map((c) => (
+                                    <SelectItem key={c.id} value={c.id}>
+                                      {c.name || c.id}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {cont && (
+                                <span className="text-gray-400 text-[10px] hidden sm:block">→ {cont.name}</span>
+                              )}
+                              <button
+                                type="button"
+                                aria-label="Remove addition"
+                                className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                                onClick={() => {
+                                  const additions = (step.additions || []).filter((_, ai) => ai !== addIdx);
+                                  updateStep(idx, { additions });
+                                }}
+                              >
                                 ×
                               </button>
-                            </span>
+                            </div>
                           );
                         })}
                       </div>
@@ -514,11 +786,16 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
                       value="__none__"
                       onValueChange={(v) => {
                         if (v === "__none__") return;
-                        if (step.additionIngredients.includes(v)) return;
+                        const existing = step.additions || [];
+                        if (existing.some((a) => a.ingredientId === v)) return;
                         updateStep(idx, {
-                          additionIngredients: [
-                            ...step.additionIngredients,
-                            v,
+                          additions: [
+                            ...existing,
+                            {
+                              ingredientId: v,
+                              massG: 0,
+                              containerId: step.containerId || (containers[0]?.id ?? ""),
+                            },
                           ],
                         });
                       }}
@@ -528,15 +805,10 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">
-                          {step.additionIngredients.length === 0
-                            ? "None"
-                            : "Add another…"}
+                          {(step.additions || []).length === 0 ? "None" : "Add another…"}
                         </SelectItem>
                         {data.ingredients
-                          .filter(
-                            (ing) =>
-                              !step.additionIngredients.includes(ing.id)
-                          )
+                          .filter((ing) => !(step.additions || []).some((a) => a.ingredientId === ing.id))
                           .map((ing) => (
                             <SelectItem key={ing.id} value={ing.id}>
                               {ing.name}
@@ -545,33 +817,40 @@ export default function ProtocolDetailClient({ id }: { id: string }) {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs">Description</Label>
-                  <Textarea
-                    className="min-h-[40px]"
-                    value={step.description}
-                    onChange={(e) =>
-                      updateStep(idx, { description: e.target.value })
-                    }
-                    rows={1}
-                  />
+                  {/* Start confirmation checkbox */}
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={step.requiresStartConfirmation ?? false}
+                      onChange={(e) =>
+                        updateStep(idx, { requiresStartConfirmation: e.target.checked })
+                      }
+                    />
+                    <span className="text-gray-700 dark:text-gray-300">Require user to confirm when step starts</span>
+                  </label>
+
+                  {/* Description */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">Description</Label>
+                    <Textarea
+                      className="min-h-[40px]"
+                      value={step.description}
+                      onChange={(e) => updateStep(idx, { description: e.target.value })}
+                      rows={1}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Hold Conditions</Label>
+                    <Input
+                      className="h-8"
+                      value={step.holdConditions}
+                      onChange={(e) => updateStep(idx, { holdConditions: e.target.value })}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Hold Conditions</Label>
-                  <Input
-                    className="h-8"
-                    value={step.holdConditions}
-                    onChange={(e) =>
-                      updateStep(idx, {
-                        holdConditions: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </CardContent>
       </Card>

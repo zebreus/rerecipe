@@ -162,17 +162,67 @@ export type ProtocolCategory =
   | "heat-first"
   | "custom";
 
+export type ContainerType = "pot" | "bowl" | "jar" | "pitcher" | "pressure-cooker" | "pan" | "other";
+
+export interface ProtocolContainer {
+  id: string;
+  name: string;
+  type: ContainerType;
+  capacityMl?: number;
+  notes?: string;
+}
+
+export interface IngredientAddition {
+  ingredientId: string;
+  massG: number;
+  containerId?: string;
+}
+
+export type StepDurationType = "fixed" | "after-event" | "user-confirm";
+
+export interface StepDuration {
+  type: StepDurationType;
+  durationMin?: number;       // for "fixed": total duration; for "after-event": duration AFTER the event
+  eventDescription?: string;  // for "after-event": e.g. "pot reaches 85°C"
+}
+
+export interface TrialStepLog {
+  stepId: string;
+  startedAt: string | null;   // ISO timestamp when step actually started
+  completedAt: string | null; // ISO timestamp when step was completed
+  durationActualSec: number | null;
+  notes: string;
+}
+
+export interface ContainerState {
+  containerId: string;
+  temperatureC: number | null;
+  agitation: "none" | "low" | "medium" | "high";
+  contents: string[];  // ingredient IDs currently in this container
+  notes: string;
+}
+
 export interface ProtocolStep {
   id: string;
   order: number;
   name: string;
   description: string;
+  // Primary container for this step
+  containerId: string | null;
   temperatureC: number | null;
-  durationMin: number | null;
-  agitationLevel: "none" | "low" | "medium" | "high";
-  additionIngredients: string[]; // ingredient IDs
+  // Structured duration (replaces durationMin)
+  duration: StepDuration;
+  // Per-container agitation (containerId -> level)
+  containerAgitation: Record<string, "none" | "low" | "medium" | "high">;
+  // Ingredient additions with amount and target container
+  additions: IngredientAddition[];
   holdConditions: string;
   expectedEffects: string[];
+  requiresStartConfirmation: boolean;
+  // Backward-compat with old saved data (optional):
+  durationMin?: number | null;
+  agitationLevel?: "none" | "low" | "medium" | "high";
+  additionIngredients?: string[];
 }
 
 export interface Protocol {
@@ -181,6 +231,7 @@ export interface Protocol {
   category: ProtocolCategory;
   description: string;
   version: number;
+  containers: ProtocolContainer[];
   steps: ProtocolStep[];
   expectedEffects: string[];
   riskFlags: string[];
@@ -226,6 +277,8 @@ export interface Trial {
   completedAt: string;
   createdAt: string;
   updatedAt: string;
+  stepLogs: TrialStepLog[];      // per-step timing log
+  containerStates: ContainerState[]; // current container states during trial
 }
 
 export interface ScoringProfile {

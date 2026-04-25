@@ -83,6 +83,7 @@ function ProtocolsListView() {
       notes: "",
       createdAt: now,
       updatedAt: now,
+      containers: [],
     };
     addProtocol(p);
     setNewName("");

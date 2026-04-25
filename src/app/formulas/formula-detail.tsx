@@ -123,6 +123,8 @@ export default function FormulaDetailClient({ id }: { id: string }) {
       completedAt: "",
       createdAt: now,
       updatedAt: now,
+      stepLogs: [],
+      containerStates: [],
     };
     addTrial(t);
     setTrialDialogOpen(false);

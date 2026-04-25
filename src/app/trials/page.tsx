@@ -95,6 +95,8 @@ function TrialsListView() {
       completedAt: "",
       createdAt: now,
       updatedAt: now,
+      stepLogs: [],
+      containerStates: [],
     };
     addTrial(t);
     return t;

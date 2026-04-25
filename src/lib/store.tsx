@@ -37,6 +37,15 @@ function normalizeProjectData(
 ): ProjectData {
   return {
     ...data,
+    trials: (data.trials || []).map((t) => ({
+      ...t,
+      stepLogs: t.stepLogs ?? [],
+      containerStates: t.containerStates ?? [],
+    })),
+    protocols: (data.protocols || []).map((p) => ({
+      ...p,
+      containers: p.containers ?? [],
+    })),
     settings: {
       ...DEFAULT_PROJECT_SETTINGS,
       ...data.settings,
