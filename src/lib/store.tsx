@@ -18,7 +18,9 @@ import type {
   Note,
   Attachment,
   ScoringProfile,
+  ProjectSettings,
 } from "./types";
+import { DEFAULT_PROJECT_SETTINGS } from "./types";
 import { createSeedData, createDefaultProjectData } from "./seed";
 import {
   calculateFormulaComponents,
@@ -27,11 +29,31 @@ import {
 
 const STORAGE_KEY = "recipe-reverse-eng-project";
 
+function normalizeProjectData(
+  data: Omit<ProjectData, "settings"> & {
+    settings?: Partial<ProjectSettings>;
+  }
+): ProjectData {
+  return {
+    ...data,
+    settings: {
+      ...DEFAULT_PROJECT_SETTINGS,
+      ...data.settings,
+    },
+  };
+}
+
 function loadData(): ProjectData {
   if (typeof window === "undefined") return createDefaultProjectData();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as ProjectData;
+    if (raw) {
+      return normalizeProjectData(
+        JSON.parse(raw) as Omit<ProjectData, "settings"> & {
+          settings?: Partial<ProjectSettings>;
+        }
+      );
+    }
   } catch {
     /* ignore */
   }
@@ -42,10 +64,10 @@ function loadData(): ProjectData {
 
 function saveData(data: ProjectData) {
   if (typeof window === "undefined") return;
-  const updated = {
+  const updated = normalizeProjectData({
     ...data,
     project: { ...data.project, updatedAt: new Date().toISOString() },
-  };
+  });
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   } catch (e) {
@@ -90,6 +112,8 @@ interface StoreContextValue {
   deleteAttachment: (id: string) => void;
   // Scoring Profiles
   updateScoringProfiles: (profiles: ScoringProfile[]) => void;
+  // Project Settings
+  updateSettings: (settings: ProjectSettings) => void;
   // Utilities
   exportJSON: () => string;
   importJSON: (json: string) => boolean;
@@ -295,14 +319,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [data, persist]
   );
 
+  // ─── Project Settings ───
+  const updateSettings = useCallback(
+    (settings: ProjectSettings) => {
+      persist({ ...data, settings });
+    },
+    [data, persist]
+  );
+
   // ─── Import / Export ───
   const exportJSON = useCallback(() => JSON.stringify(data, null, 2), [data]);
   const importJSON = useCallback(
     (json: string) => {
       try {
-        const parsed = JSON.parse(json) as ProjectData;
+        const parsed = JSON.parse(json) as Omit<ProjectData, "settings"> & {
+          settings?: Partial<ProjectSettings>;
+        };
         if (!parsed.project || !parsed.ingredients) return false;
-        persist(parsed);
+        persist(normalizeProjectData(parsed));
         return true;
       } catch {
         return false;
@@ -351,6 +385,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         addAttachment,
         deleteAttachment,
         updateScoringProfiles,
+        updateSettings,
         exportJSON,
         importJSON,
         resetToEmptyProject,

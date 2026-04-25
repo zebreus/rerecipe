@@ -32,9 +32,10 @@ import {
   EMPTY_COMPOSITION,
 } from "@/lib/types";
 import { generateId } from "@/lib/utils";
-import { Plus, Pencil, Trash2, Search, Leaf, Zap } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Leaf, Zap, HelpCircle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import {
   BarChart,
   Bar,
@@ -48,9 +49,40 @@ import {
 
 import { COMMON_INGREDIENTS } from "@/lib/common-ingredients";
 
+const CONFIDENCE_TOOLTIP =
+  "How certain we are about the correctness of this ingredient's composition data. A higher value means the data is from a reliable source and has been verified.";
+
+function ConfidenceHelpButton() {
+  return (
+    <TooltipPrimitive.Provider delayDuration={150}>
+      <TooltipPrimitive.Root>
+        <TooltipPrimitive.Trigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center rounded-sm cursor-help text-gray-400 dark:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-950 dark:focus-visible:ring-gray-300 focus-visible:ring-offset-2 ring-offset-white dark:ring-offset-gray-900"
+            aria-label="What the confidence value means"
+          >
+            <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </TooltipPrimitive.Trigger>
+        <TooltipPrimitive.Portal>
+          <TooltipPrimitive.Content
+            side="top"
+            className="z-50 max-w-xs rounded-md bg-gray-950 px-3 py-2 text-xs text-gray-50 shadow-md dark:bg-gray-50 dark:text-gray-950"
+          >
+            {CONFIDENCE_TOOLTIP}
+            <TooltipPrimitive.Arrow className="fill-gray-950 dark:fill-gray-50" />
+          </TooltipPrimitive.Content>
+        </TooltipPrimitive.Portal>
+      </TooltipPrimitive.Root>
+    </TooltipPrimitive.Provider>
+  );
+}
+
 export default function IngredientsPage() {
   const { data, addIngredient, updateIngredient, deleteIngredient } =
     useStore();
+  const settings = data.settings;
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -58,6 +90,8 @@ export default function IngredientsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [lastQuickAdded, setLastQuickAdded] = useState<string | null>(null);
+  const [quickAddSearch, setQuickAddSearch] = useState("");
+  const [quickAddCategory, setQuickAddCategory] = useState("all");
 
   const filtered = data.ingredients.filter((ing) => {
     const matchesSearch =
@@ -134,6 +168,19 @@ export default function IngredientsPage() {
       }))
     : [];
 
+  const filteredCommonIngredients = COMMON_INGREDIENTS.filter((item) => {
+    const matchesSearch =
+      item.name.toLowerCase().includes(quickAddSearch.toLowerCase()) ||
+      item.category.toLowerCase().includes(quickAddSearch.toLowerCase());
+    const matchesCategory =
+      quickAddCategory === "all" || item.category === quickAddCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const quickAddCategories = Array.from(
+    new Set(COMMON_INGREDIENTS.map((i) => i.category))
+  ).sort();
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -193,13 +240,19 @@ export default function IngredientsPage() {
                     <thead>
                       <tr className="border-b text-left text-gray-500 dark:text-gray-400">
                         <th className="pb-2 font-medium">Name</th>
-                        <th className="pb-2 font-medium">Category</th>
-                        <th className="pb-2 font-medium">Density</th>
-                        <th className="pb-2 font-medium">Cost/kg</th>
-                        <th className="pb-2 font-medium">Water %</th>
-                        <th className="pb-2 font-medium">Fat %</th>
-                        <th className="pb-2 font-medium">Protein %</th>
-                        <th className="pb-2 font-medium">Sugar %</th>
+                        {settings.showCategoryColumn && (
+                          <th className="pb-2 font-medium">Category</th>
+                        )}
+                        {settings.showDensityColumn && (
+                          <th className="pb-2 font-medium">Density</th>
+                        )}
+                        {settings.showCostColumn && (
+                          <th className="pb-2 font-medium">Cost</th>
+                        )}
+                        <th className="pb-2 font-medium">Water</th>
+                        <th className="pb-2 font-medium">Fat</th>
+                        <th className="pb-2 font-medium">Protein</th>
+                        <th className="pb-2 font-medium">Sugar</th>
                         <th className="pb-2 font-medium"></th>
                       </tr>
                     </thead>
@@ -213,26 +266,32 @@ export default function IngredientsPage() {
                           onClick={() => setSelectedId(ing.id)}
                         >
                           <td className="py-2 font-medium">{ing.name}</td>
+                          {settings.showCategoryColumn && (
+                            <td className="py-2">
+                              <Badge variant="outline" className="text-xs">
+                                {ing.category}
+                              </Badge>
+                            </td>
+                          )}
+                          {settings.showDensityColumn && (
+                            <td className="py-2">{ing.density_g_ml} g/mL</td>
+                          )}
+                          {settings.showCostColumn && (
+                            <td className="py-2">
+                              {ing.costPerKg ? `$${ing.costPerKg.toFixed(2)}/kg` : "—"}
+                            </td>
+                          )}
                           <td className="py-2">
-                            <Badge variant="outline" className="text-xs">
-                              {ing.category}
-                            </Badge>
+                            {ing.composition.water_pct}%
                           </td>
-                          <td className="py-2">{ing.density_g_ml}</td>
                           <td className="py-2">
-                            {ing.costPerKg ? `$${ing.costPerKg.toFixed(2)}` : "—"}
+                            {ing.composition.fat_pct}%
                           </td>
                           <td className="py-2">
-                            {ing.composition.water_pct}
+                            {ing.composition.protein_pct}%
                           </td>
                           <td className="py-2">
-                            {ing.composition.fat_pct}
-                          </td>
-                          <td className="py-2">
-                            {ing.composition.protein_pct}
-                          </td>
-                          <td className="py-2">
-                            {ing.composition.sugar_pct}
+                            {ing.composition.sugar_pct}%
                           </td>
                           <td className="py-2">
                             <div className="flex gap-1">
@@ -289,9 +348,16 @@ export default function IngredientsPage() {
                     <span className="text-gray-500 dark:text-gray-400">Density:</span>{" "}
                     {selected.density_g_ml} g/mL
                   </p>
-                  <p>
+                  {selected.costPerKg > 0 && (
+                    <p>
+                      <span className="text-gray-500 dark:text-gray-400">Cost:</span>{" "}
+                      ${selected.costPerKg.toFixed(2)}/kg
+                    </p>
+                  )}
+                  <p className="flex items-center gap-1">
                     <span className="text-gray-500 dark:text-gray-400">Confidence:</span>{" "}
                     {(selected.confidence * 100).toFixed(0)}%
+                    <ConfidenceHelpButton />
                   </p>
                   {selected.source && (
                     <p>
@@ -334,6 +400,21 @@ export default function IngredientsPage() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
+
+                  <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    {COMPONENT_KEYS.map((key) => {
+                      const val = selected.composition[key];
+                      if (val === 0) return null;
+                      return (
+                        <div key={key} className="flex justify-between">
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {COMPONENT_LABELS[key]}
+                          </span>
+                          <span className="font-medium">{val}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {selected.notes && (
@@ -434,7 +515,10 @@ export default function IngredientsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Confidence (0–1)</Label>
+                  <Label className="flex items-center gap-1">
+                    Confidence (0–1)
+                    <ConfidenceHelpButton />
+                  </Label>
                   <Input
                     type="number"
                     step="0.05"
@@ -525,7 +609,11 @@ export default function IngredientsPage() {
       {/* Quick Add Dialog */}
       <Dialog open={quickAddOpen} onOpenChange={(open) => {
         setQuickAddOpen(open);
-        if (!open) setLastQuickAdded(null);
+        if (!open) {
+          setLastQuickAdded(null);
+          setQuickAddSearch("");
+          setQuickAddCategory("all");
+        }
       }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -534,63 +622,87 @@ export default function IngredientsPage() {
               Click an ingredient to add it to your library instantly.
             </DialogDescription>
           </DialogHeader>
+          <div className="flex gap-2 mb-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search..."
+                value={quickAddSearch}
+                onChange={(e) => setQuickAddSearch(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <Select value={quickAddCategory} onValueChange={setQuickAddCategory}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                {quickAddCategories.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="max-h-[60vh] overflow-y-auto space-y-1">
             {lastQuickAdded && (
               <div className="px-3 py-2 mb-2 rounded-md bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm">
                 ✓ Added &quot;{lastQuickAdded}&quot; to library
               </div>
             )}
-            {COMMON_INGREDIENTS.map((item) => {
-              const alreadyAdded = data.ingredients.some(
-                (ing) => ing.name.toLowerCase() === item.name.toLowerCase()
-              );
-              return (
-                <button
-                  key={item.name}
-                  disabled={alreadyAdded}
-                  className="w-full text-left px-3 py-2 rounded-md flex items-center justify-between gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent transition-colors"
-                  onClick={() => {
-                    const now = new Date().toISOString();
-                    addIngredient({
-                      id: generateId(),
-                      name: item.name,
-                      category: item.category,
-                      density_g_ml: item.density_g_ml,
-                      composition: { ...item.composition },
-                      source: "",
-                      confidence: 0.9,
-                      costPerKg: item.costPerKg,
-                      substitutions: [],
-                      constraints: [],
-                      notes: "",
-                      createdAt: now,
-                      updatedAt: now,
-                    });
-                    setLastQuickAdded(item.name);
-                  }}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-medium text-sm truncate">
-                      {item.name}
-                    </span>
-                    <Badge variant="outline" className="text-xs shrink-0">
-                      {item.category}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {alreadyAdded ? (
-                      <span className="text-xs text-gray-400 dark:text-gray-500">
+            {filteredCommonIngredients.length === 0 ? (
+              <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
+                No ingredients match your search.
+              </p>
+            ) : (
+              filteredCommonIngredients.map((item) => {
+                const alreadyAdded = data.ingredients.some(
+                  (ing) => ing.name.toLowerCase() === item.name.toLowerCase()
+                );
+                return (
+                  <button
+                    key={item.name}
+                    disabled={alreadyAdded}
+                    className="w-full text-left px-3 py-2 rounded-md flex items-center justify-between gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent transition-colors"
+                    onClick={() => {
+                      const now = new Date().toISOString();
+                      addIngredient({
+                        id: generateId(),
+                        name: item.name,
+                        category: item.category,
+                        density_g_ml: item.density_g_ml,
+                        composition: { ...item.composition },
+                        source: "",
+                        confidence: 0.9,
+                        costPerKg: item.costPerKg,
+                        substitutions: [],
+                        constraints: [],
+                        notes: "",
+                        createdAt: now,
+                        updatedAt: now,
+                      });
+                      setLastQuickAdded(item.name);
+                    }}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium text-sm truncate">
+                        {item.name}
+                      </span>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {item.category}
+                      </Badge>
+                    </div>
+                    {alreadyAdded && (
+                      <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
                         Already added
                       </span>
-                    ) : (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        W{item.composition.water_pct}% F{item.composition.fat_pct}% P{item.composition.protein_pct}%
-                      </span>
                     )}
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })
+            )}
           </div>
         </DialogContent>
       </Dialog>

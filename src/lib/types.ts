@@ -206,6 +206,18 @@ export interface Note {
   updatedAt: string;
 }
 
+export interface ProjectSettings {
+  showDensityColumn: boolean;
+  showCostColumn: boolean;
+  showCategoryColumn: boolean;
+}
+
+export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
+  showDensityColumn: false,
+  showCostColumn: false,
+  showCategoryColumn: false,
+};
+
 export interface ProjectData {
   project: Project;
   targetProduct: TargetProduct;
@@ -216,6 +228,7 @@ export interface ProjectData {
   scoringProfiles: ScoringProfile[];
   attachments: Attachment[];
   notes: Note[];
+  settings: ProjectSettings;
 }
 
 // ─── Component keys helper ───
