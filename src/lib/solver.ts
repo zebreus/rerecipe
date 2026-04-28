@@ -387,7 +387,15 @@ export function runFormulaOptimizer(
   if (unlocked.length === 0 || targetMassG <= 0) return lines;
 
   const lockedMass = locked.reduce((sum, l) => sum + l.massG, 0);
-  const budget = Math.max(1, targetMassG - lockedMass);
+  const rawBudget = targetMassG - lockedMass;
+
+  // If locked lines already consume all (or more than) the target mass, set
+  // every unlocked line to 0 — there is nothing left to allocate.
+  if (rawBudget <= 0) {
+    return lines.map((l) => (l.locked ? l : { ...l, massG: 0 }));
+  }
+
+  const budget = rawBudget;
 
   const ingById = new Map<string, Ingredient>(
     ingredients.map((i) => [i.id, i])
@@ -478,10 +486,23 @@ export function runFormulaOptimizer(
     if (loss < 1e-8) break;
   }
 
-  const unlockedWithMasses = unlocked.map((l, j) => ({
-    ...l,
-    massG: round2(Math.max(0, p[j] * budget)),
-  }));
+  // Convert fractions back to masses. Round all but the last unlocked line and
+  // assign the remainder to the last to ensure the unlocked masses sum exactly
+  // to `budget` (preventing cumulative rounding drift).
+  const rawMasses = p.map((pj) => Math.max(0, pj * budget));
+  const unlockedWithMasses = unlocked.map((l, j) => {
+    let massG: number;
+    if (j < unlocked.length - 1) {
+      massG = round2(rawMasses[j]);
+    } else {
+      // Last line gets the remainder to preserve the exact budget sum.
+      const allocated = unlocked
+        .slice(0, j)
+        .reduce((sum, _, k) => sum + round2(rawMasses[k]), 0);
+      massG = round2(Math.max(0, budget - allocated));
+    }
+    return { ...l, massG };
+  });
 
   let ui = 0;
   return lines.map((l) => (l.locked ? l : unlockedWithMasses[ui++]));

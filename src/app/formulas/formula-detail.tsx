@@ -404,13 +404,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                           </tr>
                         </thead>
                         <tbody>
-                          {local.ingredientLines.map((line, idx) => {
-                            const ing = ingredients.find(
-                              (i) => i.id === line.ingredientId
-                            );
-                            const lineCost = ing
-                              ? (line.massG * ing.costPerKg) / 1000
-                              : 0;
+                          {(() => {
                             const totalMass = local.ingredientLines.reduce(
                               (s, l) => s + l.massG,
                               0
@@ -420,6 +414,13 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                               totalMass,
                               100
                             );
+                            return local.ingredientLines.map((line, idx) => {
+                            const ing = ingredients.find(
+                              (i) => i.id === line.ingredientId
+                            );
+                            const lineCost = ing
+                              ? (line.massG * ing.costPerKg) / 1000
+                              : 0;
                             return (
                               <tr
                                 key={idx}
@@ -461,6 +462,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                       }
                                       className="w-24 shrink-0"
                                       disabled={line.locked}
+                                      thumbAriaLabel={`${ing?.name ?? "ingredient"} mass in grams`}
                                     />
                                     <Input
                                       type="number"
@@ -538,7 +540,8 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                 </td>
                               </tr>
                             );
-                          })}
+                          });
+                          })()}
                         </tbody>
                         <tfoot>
                           <tr className="border-t">
@@ -624,7 +627,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                             <span className={`text-right tabular-nums text-xs ${diffColor}`}>
                               {targetVal === 0 && formulaVal === 0
                                 ? "—"
-                                : `${diff >= 0 ? "+" : ""}${diff.toFixed(1)} (${diff >= 0 ? "+" : ""}${relPct.toFixed(0)}%)`}
+                                : `${diff >= 0 ? "+" : ""}${diff.toFixed(1)} (${diff >= 0 ? "+" : "-"}${relPct.toFixed(0)}%)`}
                             </span>
                           </div>
                         );
