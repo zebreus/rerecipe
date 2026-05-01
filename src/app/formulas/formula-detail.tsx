@@ -43,6 +43,9 @@ import {
   EyeOff,
   Eye,
   Sliders,
+  HelpCircle,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import type {
   Formula,
@@ -50,7 +53,7 @@ import type {
   Trial,
   SolverSettings,
 } from "@/lib/types";
-import { nutritionColor, DEFAULT_SOLVER_SETTINGS } from "@/lib/types";
+import { nutritionColor, ingredientColor, DEFAULT_SOLVER_SETTINGS } from "@/lib/types";
 import {
   calculateFormulaNutrition,
   calculateMassBalance,
@@ -72,6 +75,10 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  Radar,
 } from "recharts";
 
 // Thresholds used when colour-coding nutrition deviations from target.
@@ -87,6 +94,17 @@ const COMPOSITION_MATCH_WARN = 90;
 // leave remaining mass to distribute over the others.
 const MAX_REDISTRIBUTION_PASSES = 20;
 const REDISTRIBUTION_EPS = 1e-8;
+// Step grain (grams) for the mass slider/input. Redistributed masses are
+// snapped to this grain so the controlled Radix slider receives stable values
+// (otherwise float-drift can cause it to oscillate and trigger React error
+// #185 — "too many re-renders").
+const MASS_STEP_G = 0.1;
+
+// Snap a mass value to MASS_STEP_G. Used when redistributing across multiple
+// lines so the resulting per-line values are deterministic and slider-stable.
+function snapMass(g: number): number {
+  return Math.round(g / MASS_STEP_G) * MASS_STEP_G;
+}
 
 // ─── Issue / warning types for the unified Issues card ───
 type Severity = "warning" | "error";
@@ -108,6 +126,12 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [constraintLineIdx, setConstraintLineIdx] = useState<number | null>(null);
+  // Index of the line the user has asked to delete (for the confirmation
+  // modal). null when no deletion is pending.
+  const [removeLineIdx, setRemoveLineIdx] = useState<number | null>(null);
+  // Transient feedback after an action that couldn't be carried out (e.g.
+  // trying to add an ingredient with no spare mass under a total-mass lock).
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
 
   const relatedTrials = data.trials.filter((t) => t.formulaId === id);
   const hasTrials = relatedTrials.length > 0;
@@ -136,6 +160,9 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     ...(local.solverSettings ?? {}),
   };
   const ignoredWarnings = local.ignoredWarnings ?? [];
+  // Total mass is locked by default for newly created and legacy formulas
+  // alike — the user can still toggle it off.
+  const lockTotalMass = local.lockTotalMass ?? true;
 
   function handleSaveClick() {
     if (hasTrials) setConfirmSaveOpen(true);
@@ -192,6 +219,41 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     const used = new Set(local!.ingredientLines.map((l) => l.ingredientId));
     const available = ingredients.find((i) => !used.has(i.id));
     if (!available) return;
+
+    // When the total mass is locked, adding an ingredient must preserve the
+    // total. Carve the new line's mass out of the existing unlocked lines
+    // (proportionally). If there is no spare capacity at all, refuse.
+    if (lockTotalMass) {
+      const desired = 10;
+      const otherIndexes = local!.ingredientLines
+        .map((l, i) => ({ l, i }))
+        .filter(({ l }) => !l.locked)
+        .map(({ i }) => i);
+      const shrinkCapacity = otherIndexes.reduce((sum, i) => {
+        const { min } = lineBounds(local!.ingredientLines[i]);
+        return sum + Math.max(0, local!.ingredientLines[i].massG - min);
+      }, 0);
+      if (shrinkCapacity <= REDISTRIBUTION_EPS) {
+        setActionMsg(
+          "Total mass is locked and the existing unlocked lines have no spare mass to give. Unlock the total or an existing line first."
+        );
+        return;
+      }
+      const newMass = snapMass(Math.min(desired, shrinkCapacity));
+      const masses = local!.ingredientLines.map((l) => l.massG);
+      const redistributed = distributeAcrossBoundedLines(masses, otherIndexes, -newMass)
+        .map(snapMass);
+      const updated = local!.ingredientLines.map((l, i) => ({ ...l, massG: redistributed[i] }));
+      update({
+        ingredientLines: [
+          ...updated,
+          { ingredientId: available.id, massG: newMass, locked: false },
+        ],
+      });
+      setActionMsg(null);
+      return;
+    }
+
     update({
       ingredientLines: [
         ...local!.ingredientLines,
@@ -258,18 +320,20 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     return next;
   }
 
-  // Mass-preserving slider behaviour. When `local.lockTotalMass` is true,
-  // changing one line's mass proportionally rescales the other unlocked
-  // lines so the overall total stays constant. The line being changed and
-  // any locked line is excluded from rescaling.
+  // Mass-preserving slider behaviour. When the total mass is locked, changing
+  // one line's mass proportionally rescales the other unlocked lines so the
+  // overall total stays constant. The line being changed and any locked line
+  // are excluded from rescaling.
   function setLineMass(index: number, newMass: number) {
     const lines = local!.ingredientLines;
     const oldMass = lines[index].massG;
     const requestedMass = clampLineMass(lines[index], newMass);
 
-    if (!local!.lockTotalMass) {
+    if (!lockTotalMass) {
+      const snapped = snapMass(requestedMass);
+      if (Math.abs(snapped - oldMass) < REDISTRIBUTION_EPS) return;
       const updated = lines.map((l, i) =>
-        i === index ? { ...l, massG: requestedMass } : l
+        i === index ? { ...l, massG: snapped } : l
       );
       update({ ingredientLines: updated });
       return;
@@ -279,16 +343,15 @@ export default function FormulaDetailClient({ id }: { id: string }) {
       .map((l, i) => ({ l, i }))
       .filter(({ l, i }) => i !== index && !l.locked)
       .map(({ i }) => i);
-    const delta = requestedMass - oldMass;
 
-    if (otherIndexes.length === 0 || Math.abs(delta) < 1e-8) {
-      // Nothing to rescale against — just set the value.
-      const updated = lines.map((l, i) =>
-        i === index ? { ...l, massG: requestedMass } : l
-      );
-      update({ ingredientLines: updated });
-      return;
-    }
+    // With the total locked there must be at least one *other* unlocked line
+    // to absorb the change — otherwise moving this slider would change the
+    // total mass, violating the lock. The slider is also disabled in the UI
+    // for this case; this guards against any other code path.
+    if (otherIndexes.length === 0) return;
+
+    const delta = requestedMass - oldMass;
+    if (Math.abs(delta) < REDISTRIBUTION_EPS) return;
 
     const shrinkCapacity = otherIndexes.reduce((sum, i) => {
       const { min } = lineBounds(lines[i]);
@@ -305,11 +368,19 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     const safeDelta = delta > 0
       ? Math.min(delta, shrinkCapacity)
       : Math.max(delta, -growCapacity);
+    if (Math.abs(safeDelta) < REDISTRIBUTION_EPS) return;
+
     const masses = lines.map((l) => l.massG);
     masses[index] = oldMass + safeDelta;
     const redistributed = distributeAcrossBoundedLines(masses, otherIndexes, -safeDelta);
 
-    const updated = lines.map((l, i) => ({ ...l, massG: redistributed[i] }));
+    // Snap every value to the slider's step grain. Without this the
+    // controlled Radix Slider receives float values that don't snap to its
+    // step and emits onValueChange repeatedly to "correct" the position,
+    // causing React error #185 ("too many re-renders"). The total can drift
+    // by at most MASS_STEP_G per change which is well below MASS_TOLERANCE_G.
+    const snapped = redistributed.map(snapMass);
+    const updated = lines.map((l, i) => ({ ...l, massG: snapped[i] }));
     update({ ingredientLines: updated });
   }
 
@@ -320,10 +391,59 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     update({ ingredientLines: lines });
   }
 
+  // Helpers used by the deletion confirmation modal and the trash button.
+  // Under a total-mass lock, removing a line redistributes its mass over the
+  // other unlocked lines (proportionally), and deleting the *last* unlocked
+  // line is forbidden because that would necessarily change the total.
+  function unlockedIndexesExcluding(index: number): number[] {
+    return local!.ingredientLines
+      .map((l, i) => ({ l, i }))
+      .filter(({ l, i }) => i !== index && !l.locked)
+      .map(({ i }) => i);
+  }
+  function canRemoveLineUnderLock(index: number): boolean {
+    if (!lockTotalMass) return true;
+    const others = unlockedIndexesExcluding(index);
+    if (others.length === 0) return false;
+    const growCapacity = others.reduce((sum, i) => {
+      const { max } = lineBounds(local!.ingredientLines[i]);
+      return sum + Math.max(0, max - local!.ingredientLines[i].massG);
+    }, 0);
+    // Need at least enough capacity in the other unlocked lines to absorb the
+    // mass of the line being removed.
+    return growCapacity >= local!.ingredientLines[index].massG - REDISTRIBUTION_EPS;
+  }
+
   function removeLine(index: number) {
-    update({
-      ingredientLines: local!.ingredientLines.filter((_, i) => i !== index),
-    });
+    const lines = local!.ingredientLines;
+    if (lockTotalMass && canRemoveLineUnderLock(index)) {
+      // Push the removed mass into the other unlocked lines so the total
+      // stays put.
+      const others = unlockedIndexesExcluding(index);
+      const masses = lines.map((l) => l.massG);
+      const redistributed = distributeAcrossBoundedLines(masses, others, lines[index].massG)
+        .map(snapMass);
+      const next = lines
+        .map((l, i) => ({ ...l, massG: redistributed[i] }))
+        .filter((_, i) => i !== index);
+      update({ ingredientLines: next });
+    } else {
+      // Either the lock is off or there's no way to preserve the total —
+      // in the locked case the modal also requires the user to disable the
+      // lock first, so this falls through to a plain removal.
+      update({ ingredientLines: lines.filter((_, i) => i !== index) });
+    }
+  }
+
+  function requestRemoveLine(index: number, replacementId?: string) {
+    if (replacementId) {
+      // Replace in place — preserves mass and total exactly.
+      updateLine(index, { ingredientId: replacementId });
+      setRemoveLineIdx(null);
+      return;
+    }
+    removeLine(index);
+    setRemoveLineIdx(null);
   }
 
   function moveLine(index: number, direction: "up" | "down") {
@@ -488,10 +608,50 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   }
 
   // ─── Derived viz data ───
-  const heatmapData = contributions.map((c) => {
-    const row: Record<string, number | string> = { name: c.ingredientName };
-    for (const n of trackedNutrients) row[n.name] = c.values[n.name] ?? 0;
+  // Pivoted heatmap: one row per *tracked nutrient*, one stacked bar per
+  // ingredient, summing to the nutrient's absolute amount in this formula.
+  // Each ingredient is shown in its assigned color so it stays consistent
+  // across every chart on the page (#9, #10).
+  const nutrientHeatmapData = trackedNutrients.map((n) => {
+    const row: Record<string, number | string> = { name: `${n.name} (${n.unit})` };
+    for (const c of contributions) row[c.ingredientName] = c.values[n.name] ?? 0;
     return row;
+  });
+  const ingredientNamesInUse = contributions.map((c) => c.ingredientName);
+  // Only ingredients actually present in the formula get a reference outline
+  // on the radar — rendering one per global ingredient gets noisy and slow on
+  // large libraries. Their colour is still keyed to the global index so it
+  // stays consistent with the bar chart and the per-row sparklines.
+  const usedIngredientIds = new Set(local.ingredientLines.map((l) => l.ingredientId));
+  const usedIngredients = ingredients.filter((i) => usedIngredientIds.has(i.id));
+
+  // Radar data: one entry per tracked nutrient. We normalise every series
+  // against the larger of (target, calculated) so the polygons are all on
+  // the same 0–1 scale; that way axes with very different units (Energy in
+  // kcal vs Salt in g) are visually comparable. Per-ingredient reference
+  // outlines use 50 g of that ingredient — useful as a sanity check for
+  // "where does each nutrient come from?". (#10)
+  const radarData = trackedNutrients.map((n) => {
+    const target = n.per100g;
+    const formulaVal = calc[n.name] ?? 0;
+    const ingredientVals: Record<string, number> = {};
+    for (const ing of usedIngredients) {
+      ingredientVals[ing.id] = (ing.nutrition?.[n.name] ?? 0) * 0.5; // per 50 g
+    }
+    const ingredientMax = Object.values(ingredientVals).reduce(
+      (m, v) => Math.max(m, v),
+      0
+    );
+    const denom = Math.max(target, formulaVal, ingredientMax, MIN_DEVIATION_DENOM);
+    const norm: Record<string, number | string> = {
+      nutrient: n.name,
+      Target: target / denom,
+      Formula: formulaVal / denom,
+    };
+    for (const ing of usedIngredients) {
+      norm[`ing:${ing.id}`] = ingredientVals[ing.id] / denom;
+    }
+    return norm;
   });
 
   function runSolver() {
@@ -623,47 +783,63 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                         const { min: effectiveMin, max: boundMax } = lineBounds(line);
                         const effectiveMax = Math.max(effectiveMin, Math.min(sliderMax, boundMax));
                         const sliderValue = Math.max(effectiveMin, Math.min(effectiveMax, line.massG));
+                        // Under a total-mass lock, a slider with no other
+                        // unlocked line to absorb its change must be disabled
+                        // — otherwise moving it would change the total. (#4)
+                        const noOtherUnlocked = lockTotalMass && local.ingredientLines.every(
+                          (l, i) => i === idx || l.locked
+                        );
+                        const sliderDisabled = line.locked || noOtherUnlocked;
                         return (
                           <tr key={idx} className="border-b last:border-0">
-                            <td className="py-2 pr-2 w-40">
-                              <Select
-                                value={line.ingredientId}
-                                onValueChange={(val) => updateLine(idx, { ingredientId: val })}
-                              >
-                                <SelectTrigger className="h-8 print:hidden">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <span className="hidden print:block">
-                                  {ing?.name ?? line.ingredientId}
-                                </span>
-                                <SelectContent>
-                                  {ingredients.map((i) => (
-                                    <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                            <td className="py-2 pr-2 w-48">
+                              <div className="flex items-center gap-2">
+                                <Select
+                                  value={line.ingredientId}
+                                  onValueChange={(val) => updateLine(idx, { ingredientId: val })}
+                                >
+                                  <SelectTrigger className="h-8 print:hidden">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <span className="hidden print:block">
+                                    {ing?.name ?? line.ingredientId}
+                                  </span>
+                                  <SelectContent>
+                                    {ingredients.map((i) => (
+                                      <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {/* Small filled radar of this ingredient's
+                                    nutrition profile, in its assigned color. (#11) */}
+                                <IngredientRadar
+                                  ingredient={ing}
+                                  trackedNutrients={trackedNutrients}
+                                  color={ingredientColor(line.ingredientId, ingredients)}
+                                />
+                              </div>
                             </td>
                             <td className="py-2 pr-2">
                               <div className="flex items-center gap-2">
                                 <Slider
                                   min={effectiveMin}
                                   max={effectiveMax}
-                                  step={0.1}
+                                  step={MASS_STEP_G}
                                   value={[sliderValue]}
                                   onValueChange={([val]) => setLineMass(idx, val)}
                                   className="w-24 shrink-0 print:hidden"
-                                  disabled={line.locked}
+                                  disabled={sliderDisabled}
                                   thumbAriaLabel={`${ing?.name ?? "ingredient"} mass in grams`}
                                 />
                                 <Input
                                   type="number"
-                                  step="0.1"
+                                  step={MASS_STEP_G}
                                   min={line.minG ?? 0}
                                   max={Number.isFinite(boundMax) ? boundMax : undefined}
                                   className="h-8 w-20 shrink-0 print:hidden"
                                   value={line.massG}
                                   onChange={(e) => setLineMass(idx, Number(e.target.value))}
-                                  disabled={line.locked}
+                                  disabled={sliderDisabled}
                                 />
                                 <span className="hidden print:block tabular-nums">
                                   {line.massG.toFixed(1)}
@@ -732,7 +908,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                 variant="ghost" size="icon"
                                 className="h-7 w-7 text-red-500 dark:text-red-400"
                                 aria-label={`Remove ${ing?.name ?? "ingredient"}`}
-                                onClick={() => removeLine(idx)}
+                                onClick={() => setRemoveLineIdx(idx)}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
@@ -748,13 +924,13 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                             <span>Total</span>
                             <Button
                               variant="ghost" size="icon" className="h-7 w-7 print:hidden"
-                              aria-label={local.lockTotalMass ? "Unlock total mass" : "Lock total mass"}
-                              title={local.lockTotalMass
+                              aria-label={lockTotalMass ? "Unlock total mass" : "Lock total mass"}
+                              title={lockTotalMass
                                 ? "Total mass is locked: changing one slider rescales the others to preserve the total."
                                 : "Lock total mass: when sliding, other unlocked ingredients are rescaled to preserve the total."}
-                              onClick={() => update({ lockTotalMass: !local.lockTotalMass })}
+                              onClick={() => update({ lockTotalMass: !lockTotalMass })}
                             >
-                              {local.lockTotalMass
+                              {lockTotalMass
                                 ? <Lock className="h-3.5 w-3.5 text-amber-600" />
                                 : <Unlock className="h-3.5 w-3.5 text-gray-400" />}
                             </Button>
@@ -793,46 +969,38 @@ export default function FormulaDetailClient({ id }: { id: string }) {
             </CardContent>
           </Card>
 
-          {/* Heatmap moved below the ingredient lines (#6). */}
-          {heatmapData.length > 0 && (
+          {/* Per-nutrient stacked breakdown: each row is a tracked nutrient
+              and each segment shows how much of it comes from each
+              ingredient, colored consistently with the radar charts. (#9) */}
+          {nutrientHeatmapData.length > 0 && ingredientNamesInUse.length > 0 && (
             <Card className="print:hidden">
               <CardHeader>
-                <CardTitle className="text-base">Ingredient Contribution Heatmap (grams)</CardTitle>
+                <CardTitle className="text-base">Nutrient Sources</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={Math.max(200, heatmapData.length * 40 + 60)}>
-                  <BarChart data={heatmapData} layout="vertical">
+                <ResponsiveContainer
+                  width="100%"
+                  height={Math.max(200, nutrientHeatmapData.length * 32 + 60)}
+                >
+                  <BarChart data={nutrientHeatmapData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis type="number" tick={{ fontSize: 10 }} />
-                    <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 10 }} />
+                    <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
                     <Tooltip />
-                    <Legend />
-                    {trackedNutrients.map((n) => (
-                      <Bar key={n.name} dataKey={n.name} stackId="a" fill={nutritionColor(n.name)} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    {contributions.map((c) => (
+                      <Bar
+                        key={c.ingredientId}
+                        dataKey={c.ingredientName}
+                        stackId="a"
+                        fill={ingredientColor(c.ingredientId, ingredients)}
+                      />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
           )}
-
-          {/* Ingredient declaration (label-style); merged from former Label tab (#9). */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Ingredient Declaration</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                {[...local.ingredientLines]
-                  .sort((a, b) => b.massG - a.massG)
-                  .map((line) => {
-                    const ing = ingredients.find((i) => i.id === line.ingredientId);
-                    return `${ing?.name ?? line.ingredientId} (${line.massG.toFixed(1)}g)`;
-                  })
-                  .join(", ") || "No ingredients added."}
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Right column: nutrition summary */}
@@ -916,13 +1084,82 @@ export default function FormulaDetailClient({ id }: { id: string }) {
             </CardContent>
           </Card>
 
+          {/* Radar chart of nutrition profile (#10). */}
+          {trackedNutrients.length >= 3 && (
+            <Card className="print:hidden">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Nutrition Profile</CardTitle>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Each axis is one tracked nutrient, normalised to the largest value among
+                  target, formula and ingredient references so all axes are comparable.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={260}>
+                  <RadarChart data={radarData} outerRadius="75%">
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="nutrient" tick={{ fontSize: 10 }} />
+                    {/* Dim per-ingredient reference outlines (per 50 g) — they
+                        sit underneath the target/formula polygons. */}
+                    {usedIngredients.map((ing) => (
+                      <Radar
+                        key={ing.id}
+                        name={ing.name}
+                        dataKey={`ing:${ing.id}`}
+                        stroke={ingredientColor(ing.id, ingredients)}
+                        strokeOpacity={0.35}
+                        fill="none"
+                        strokeWidth={1}
+                        isAnimationActive={false}
+                      />
+                    ))}
+                    <Radar
+                      name="Target"
+                      dataKey="Target"
+                      stroke="#6b7280"
+                      strokeWidth={2}
+                      strokeDasharray="4 3"
+                      fill="none"
+                      isAnimationActive={false}
+                    />
+                    <Radar
+                      name="Formula"
+                      dataKey="Formula"
+                      stroke="#4f46e5"
+                      strokeWidth={2}
+                      fill="#4f46e5"
+                      fillOpacity={0.15}
+                      isAnimationActive={false}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardContent className="pt-4">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <ComplianceBadge status={compliance.status} compliance={compliance} />
+              </div>
               <div className="text-center">
                 <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
                   {sim.toFixed(0)}%
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Composition Match</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 inline-flex items-center gap-1 justify-center">
+                  Composition Match
+                  <span
+                    className="text-gray-400 dark:text-gray-500 cursor-help"
+                    title={
+                      "Composition match (0–100%) is the average per-nutrient agreement between the formula's per-100 g profile and the target. " +
+                      "For each tracked nutrient it computes 1 − |formula − target| / max(|target|, |formula|), clamps to [0,1], averages across all tracked nutrients, then scales to 0–100%."
+                    }
+                    aria-label="How is composition match calculated?"
+                  >
+                    <HelpCircle className="h-3.5 w-3.5" />
+                  </span>
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -1036,6 +1273,47 @@ export default function FormulaDetailClient({ id }: { id: string }) {
         }}
       />
 
+      {/* Remove ingredient confirmation. Under a total-mass lock the modal
+          also offers to swap the ingredient out for another one rather than
+          delete it, so the lock invariant stays intact. (#7) */}
+      <RemoveIngredientDialog
+        key={removeLineIdx ?? "no-remove"}
+        line={removeLineIdx !== null ? local.ingredientLines[removeLineIdx] : null}
+        ingredientName={
+          removeLineIdx !== null
+            ? ingredients.find((i) => i.id === local.ingredientLines[removeLineIdx].ingredientId)?.name ?? ""
+            : ""
+        }
+        lockTotalMass={lockTotalMass}
+        canRemoveUnderLock={removeLineIdx !== null && canRemoveLineUnderLock(removeLineIdx)}
+        replacementOptions={ingredients.filter(
+          (i) =>
+            removeLineIdx === null ||
+            (i.id !== local.ingredientLines[removeLineIdx].ingredientId &&
+              !local.ingredientLines.some((l) => l.ingredientId === i.id))
+        )}
+        onClose={() => setRemoveLineIdx(null)}
+        onConfirm={(replacementId) => {
+          if (removeLineIdx === null) return;
+          requestRemoveLine(removeLineIdx, replacementId);
+        }}
+      />
+
+      {/* Transient action message (e.g. "can't add — no spare mass"). */}
+      {actionMsg && (
+        <Dialog open onOpenChange={() => setActionMsg(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Action blocked</DialogTitle>
+              <DialogDescription>{actionMsg}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button onClick={() => setActionMsg(null)}>OK</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Create Trial Dialog */}
       <Dialog open={trialDialogOpen} onOpenChange={setTrialDialogOpen}>
         <DialogContent>
@@ -1119,7 +1397,10 @@ function IssuesCard({
     : { bg: "bg-green-50 dark:bg-green-900/20", text: "text-green-700 dark:text-green-300", border: "border-green-200 dark:border-green-800" };
 
   return (
-    <div className={`rounded-md px-4 py-3 text-sm ${palette.bg} ${palette.text} border ${palette.border}`}>
+    // Stable height (#12): keep enough room for ~5 issue lines so the page
+    // below doesn't jump as the issue count changes while sliding. The list
+    // scrolls internally when there are more issues than fit.
+    <div className={`rounded-md px-4 py-3 text-sm min-h-[10rem] flex flex-col ${palette.bg} ${palette.text} border ${palette.border}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 shrink-0" />
@@ -1144,48 +1425,50 @@ function IssuesCard({
           </Button>
         )}
       </div>
-      {visibleIssues.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {visibleIssues.map((iss) => (
-            <li key={iss.key} className="flex items-start gap-2 text-xs">
-              <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0"
-                    style={{ background: iss.severity === "error" ? "#dc2626" : "#f59e0b" }} />
-              <span className="flex-1">{iss.text}</span>
-              <button
-                type="button"
-                onClick={() => ignoreIssue(iss.key)}
-                className="opacity-60 hover:opacity-100 print:hidden"
-                title="Ignore this warning"
-                aria-label="Ignore warning"
-              >
-                <EyeOff className="h-3.5 w-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {showHidden && hiddenIssues.length > 0 && (
-        <div className="mt-3 pt-2 border-t border-current/20">
-          <p className="text-xs uppercase tracking-wide opacity-70 mb-1">Ignored</p>
+      <div className="mt-2 flex-1 overflow-y-auto pr-1">
+        {visibleIssues.length > 0 && (
           <ul className="space-y-1">
-            {hiddenIssues.map((iss) => (
-              <li key={iss.key} className="flex items-start gap-2 text-xs opacity-70">
-                <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0 bg-current" />
+            {visibleIssues.map((iss) => (
+              <li key={iss.key} className="flex items-start gap-2 text-xs">
+                <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ background: iss.severity === "error" ? "#dc2626" : "#f59e0b" }} />
                 <span className="flex-1">{iss.text}</span>
                 <button
                   type="button"
-                  onClick={() => unignoreIssue(iss.key)}
-                  className="opacity-60 hover:opacity-100"
-                  title="Unhide this warning"
-                  aria-label="Unhide warning"
+                  onClick={() => ignoreIssue(iss.key)}
+                  className="opacity-60 hover:opacity-100 print:hidden"
+                  title="Ignore this warning"
+                  aria-label="Ignore warning"
                 >
-                  <Eye className="h-3.5 w-3.5" />
+                  <EyeOff className="h-3.5 w-3.5" />
                 </button>
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        )}
+        {showHidden && hiddenIssues.length > 0 && (
+          <div className="mt-3 pt-2 border-t border-current/20">
+            <p className="text-xs uppercase tracking-wide opacity-70 mb-1">Ignored</p>
+            <ul className="space-y-1">
+              {hiddenIssues.map((iss) => (
+                <li key={iss.key} className="flex items-start gap-2 text-xs opacity-70">
+                  <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0 bg-current" />
+                  <span className="flex-1">{iss.text}</span>
+                  <button
+                    type="button"
+                    onClick={() => unignoreIssue(iss.key)}
+                    className="opacity-60 hover:opacity-100"
+                    title="Unhide this warning"
+                    aria-label="Unhide warning"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1349,6 +1632,175 @@ function ConstraintDialog({
           >
             Save
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Small radar sparkline (#11) ───
+// A 32×32 px filled radar of an ingredient's nutrition profile, drawn in the
+// ingredient's assigned color. Each axis is a tracked nutrient and is
+// normalised to that nutrient's own maximum across the ingredient's full
+// per-100 g profile so the polygon shape encodes "what's this ingredient
+// rich in?" rather than absolute magnitudes (which differ wildly by unit).
+function IngredientRadar({
+  ingredient, trackedNutrients, color,
+}: {
+  ingredient: { nutrition: Record<string, number> } | undefined;
+  trackedNutrients: { name: string }[];
+  color: string;
+}) {
+  if (!ingredient || trackedNutrients.length < 3) return null;
+  const max = trackedNutrients.reduce(
+    (m, n) => Math.max(m, ingredient.nutrition?.[n.name] ?? 0),
+    0
+  );
+  if (max <= 0) return null;
+  const data = trackedNutrients.map((n) => ({
+    nutrient: n.name,
+    v: (ingredient.nutrition?.[n.name] ?? 0) / max,
+  }));
+  return (
+    <div
+      className="w-8 h-8 shrink-0 print:hidden"
+      title={`${trackedNutrients
+        .map((n) => `${n.name}: ${(ingredient.nutrition?.[n.name] ?? 0).toFixed(1)}`)
+        .join(", ")} (per 100 g)`}
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart data={data} outerRadius="80%">
+          <PolarGrid stroke="currentColor" strokeOpacity={0.15} />
+          <Radar
+            dataKey="v"
+            stroke={color}
+            fill={color}
+            fillOpacity={0.55}
+            isAnimationActive={false}
+          />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ─── Compliance badge (#14) ───
+function ComplianceBadge({
+  status, compliance,
+}: {
+  status: "compliant" | "warning" | "non-compliant";
+  compliance: ReturnType<typeof checkCompliance>;
+}) {
+  const offenders = compliance.deviations
+    .map((d) => `${d.name} (${d.relDiffPct.toFixed(0)}%)`)
+    .slice(0, 4)
+    .join(", ");
+  const explainer =
+    "A formula is compliant when every tracked nutrient is within 10% of its target. " +
+    "Between 10% and 25% it's a warning; above 25% it's non-compliant. " +
+    (status === "compliant"
+      ? "All tracked nutrients are within 10% of target."
+      : `Worst-deviating nutrients: ${offenders || "none"}.`);
+  if (status === "compliant") {
+    return (
+      <Badge
+        variant="outline"
+        className="border-green-300 text-green-700 dark:border-green-800 dark:text-green-300 cursor-help"
+        title={explainer}
+      >
+        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Compliant
+      </Badge>
+    );
+  }
+  if (status === "warning") {
+    return (
+      <Badge
+        variant="outline"
+        className="border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300 cursor-help"
+        title={explainer}
+      >
+        <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Borderline
+      </Badge>
+    );
+  }
+  return (
+    <Badge
+      variant="outline"
+      className="border-red-300 text-red-700 dark:border-red-800 dark:text-red-300 cursor-help"
+      title={explainer}
+    >
+      <XCircle className="h-3.5 w-3.5 mr-1" /> Non-compliant
+    </Badge>
+  );
+}
+
+// ─── Remove ingredient confirmation (#7) ───
+// When the total mass is locked we either redistribute the removed mass to
+// the other unlocked lines (when there is capacity), or offer to swap the
+// ingredient for another one. Removing the only remaining unlocked line
+// would necessarily change the total, so it's blocked.
+function RemoveIngredientDialog({
+  line, ingredientName, lockTotalMass, canRemoveUnderLock, replacementOptions,
+  onClose, onConfirm,
+}: {
+  line: FormulaLine | null;
+  ingredientName: string;
+  lockTotalMass: boolean;
+  canRemoveUnderLock: boolean;
+  replacementOptions: { id: string; name: string }[];
+  onClose: () => void;
+  onConfirm: (replacementId?: string) => void;
+}) {
+  const [replacementId, setReplacementId] = useState<string>("");
+  const open = line !== null;
+  const blocked = lockTotalMass && !canRemoveUnderLock;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Remove {ingredientName || "ingredient"}?</DialogTitle>
+          <DialogDescription>
+            {!lockTotalMass && (
+              <>This will remove {ingredientName || "the ingredient"} from the formula. The total mass will decrease accordingly.</>
+            )}
+            {lockTotalMass && canRemoveUnderLock && (
+              <>The total mass is locked. Removing {ingredientName || "this ingredient"} will redistribute its {line ? line.massG.toFixed(1) : ""} g over the other unlocked lines so the total stays the same.</>
+            )}
+            {blocked && (
+              <>The total mass is locked and there&apos;s nowhere to redistribute the removed mass — it&apos;s the only unlocked line, or the others have no spare capacity. Either unlock the total mass first, or replace this ingredient with another one below.</>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        {replacementOptions.length > 0 && (
+          <div className="space-y-2">
+            <Label className="text-xs">Or replace with another ingredient</Label>
+            <Select value={replacementId} onValueChange={setReplacementId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pick a replacement…" />
+              </SelectTrigger>
+              <SelectContent>
+                {replacementOptions.map((i) => (
+                  <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          {replacementId && (
+            <Button onClick={() => onConfirm(replacementId)}>Replace</Button>
+          )}
+          {!blocked && !replacementId && (
+            <Button
+              variant="outline"
+              className="text-red-600 dark:text-red-400"
+              onClick={() => onConfirm()}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -83,6 +83,35 @@ export function nutritionColor(name: string): string {
   return NUTRITION_COLOR_PALETTE[hash % NUTRITION_COLOR_PALETTE.length];
 }
 
+// A consciously different palette from the nutrition one so an ingredient
+// and a nutrient never share a color in the same chart.
+const INGREDIENT_COLOR_PALETTE = [
+  "#0ea5e9", // sky
+  "#f97316", // orange
+  "#a855f7", // purple
+  "#22c55e", // green
+  "#eab308", // yellow
+  "#ef4444", // red
+  "#06b6d4", // cyan
+  "#d946ef", // fuchsia
+  "#65a30d", // lime-700
+  "#f43f5e", // rose
+  "#0d9488", // teal-600
+  "#7c3aed", // violet-600
+];
+
+// Deterministic color for an ingredient based on its position in the global
+// `ingredients` array, so the same ingredient gets the same color across every
+// chart on a page.
+export function ingredientColor(
+  ingredientId: string,
+  ingredients: { id: string }[]
+): string {
+  const idx = ingredients.findIndex((i) => i.id === ingredientId);
+  if (idx < 0) return INGREDIENT_COLOR_PALETTE[0];
+  return INGREDIENT_COLOR_PALETTE[idx % INGREDIENT_COLOR_PALETTE.length];
+}
+
 // An entry in the ordered list of expected ingredients for the target product.
 // The array order represents the expected descending mass-percentage order
 // (as printed on an ingredient label). `targetPct` is the expected mass

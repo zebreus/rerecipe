@@ -321,39 +321,34 @@ export function checkIngredientOrderCompliance(
   }
 
   // ── 2. Order mismatch ──
-  // Sort formula lines by descending mass (as on a label) and compare
-  // against the target ingredient order.
-  if (totalG > 0 && targetIngredients.length > 1) {
-    // Only consider target ingredients that are present in the formula.
+  // Compare the *line order* on the formula (the user-controlled list order
+  // shown in the table) against the target order. Mass-based ordering is
+  // surfaced as a separate per-line warning by the formula detail page so we
+  // don't double-report it here.
+  if (targetIngredients.length > 1) {
+    // Order ingredients appear in the target product (label order).
     const presentTargetIds = targetIngredients
       .map((ti) => ti.ingredientId)
       .filter((id) => lineByIngId.has(id));
 
-    // Actual order: target ingredient IDs sorted by descending mass in formula.
-    const actualOrder = [...presentTargetIds].sort((a, b) => {
-      const mA = lineByIngId.get(a)?.massG ?? 0;
-      const mB = lineByIngId.get(b)?.massG ?? 0;
-      return mB - mA;
-    });
+    // Order ingredients appear in the formula's line list, restricted to those
+    // that are part of the target list.
+    const targetIdSet = new Set(presentTargetIds);
+    const actualOrder = lines
+      .map((l) => l.ingredientId)
+      .filter((id) => targetIdSet.has(id));
 
     for (let i = 0; i < presentTargetIds.length; i++) {
       if (actualOrder[i] !== presentTargetIds[i]) {
         const actualId = actualOrder[i];
         const actualName = ingById.get(actualId)?.name ?? actualId;
-        // Report order mismatch for the ingredient that is out of place.
-        // To avoid duplicate reports, only report the first mismatch.
-        const alreadyReported = issues.some(
-          (iss) => iss.kind === "order-mismatch" && iss.ingredientId === actualId
-        );
-        if (!alreadyReported) {
-          issues.push({
-            kind: "order-mismatch",
-            ingredientId: actualId,
-            ingredientName: actualName,
-            expectedRank: presentTargetIds.indexOf(actualId) + 1,
-            actualRank: i + 1,
-          });
-        }
+        issues.push({
+          kind: "order-mismatch",
+          ingredientId: actualId,
+          ingredientName: actualName,
+          expectedRank: presentTargetIds.indexOf(actualId) + 1,
+          actualRank: i + 1,
+        });
         break; // report first mismatch only to keep noise low
       }
     }

@@ -194,6 +194,7 @@ export function createSeedData(): ProjectData {
       name: "Candidate A – Milk-heavy",
       description: "High milk ratio with cream for richness",
       version: 1,
+      lockTotalMass: true,
       ingredientLines: [
         { ingredientId: "ing-1", massG: 130, locked: false },
         { ingredientId: "ing-2", massG: 35, locked: false },

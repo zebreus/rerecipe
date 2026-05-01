@@ -116,6 +116,7 @@ function FormulasListView() {
       name: newName.trim(),
       description: newDesc.trim(),
       version: 1,
+      lockTotalMass: true,
       ingredientLines,
       calculatedNutrition: {},
       totalMassG: 0,
