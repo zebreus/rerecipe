@@ -169,6 +169,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   );
   const colorForIngredient = (ingredientId: string) =>
     ingredientColorById.get(ingredientId) ?? ingredientColor(ingredientId, ingredientIndexById);
+  const usedIngredientIds = new Set(local.ingredientLines.map((l) => l.ingredientId));
 
   function handleSaveClick() {
     if (hasTrials) setConfirmSaveOpen(true);
@@ -223,8 +224,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   function addLine() {
     if (!local) return;
     if (ingredients.length === 0) return;
-    const used = new Set(local.ingredientLines.map((l) => l.ingredientId));
-    const available = ingredients.find((i) => !used.has(i.id));
+    const available = ingredients.find((i) => !usedIngredientIds.has(i.id));
     if (!available) return;
 
     if (local.ingredientLines.length === 0) {
@@ -320,10 +320,11 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     adjustableIndexes: number[],
     targetTotal: number
   ): number[] {
+    if (!local) return baseMasses;
     const next = [...baseMasses];
 
     for (const i of adjustableIndexes) {
-      next[i] = snapAndClampLineMass(i, rawMasses[i]);
+      next[i] = clampLineMass(local.ingredientLines[i], snapMass(rawMasses[i]));
     }
 
     let residual = targetTotal - next.reduce((sum, mass) => sum + mass, 0);
@@ -334,7 +335,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
       pass++
     ) {
       const candidates = adjustableIndexes.filter((i) => {
-        const { min, max } = lineBounds(local!.ingredientLines[i]);
+        const { min, max } = lineBounds(local.ingredientLines[i]);
         return residual > 0
           ? next[i] < max - REDISTRIBUTION_EPS
           : next[i] > min + REDISTRIBUTION_EPS;
@@ -343,7 +344,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
       if (candidates.length === 0) break;
 
       const i = candidates[0];
-      const { min, max } = lineBounds(local!.ingredientLines[i]);
+      const { min, max } = lineBounds(local.ingredientLines[i]);
       const applied = residual > 0
         ? Math.min(residual, max - next[i])
         : Math.max(residual, min - next[i]);
@@ -709,7 +710,6 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   // on the radar — rendering one per global ingredient gets noisy and slow on
   // large libraries. Their colour is still keyed to the global index so it
   // stays consistent with the bar chart and the per-row sparklines.
-  const usedIngredientIds = new Set(local.ingredientLines.map((l) => l.ingredientId));
   const usedIngredients = ingredients.filter((i) => usedIngredientIds.has(i.id));
 
   // Radar data: one entry per tracked nutrient. We normalise every series
