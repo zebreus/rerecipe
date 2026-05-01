@@ -106,6 +106,10 @@ function snapMass(g: number): number {
   return Math.round(g / MASS_STEP_G) * MASS_STEP_G;
 }
 
+function snapMassDown(g: number): number {
+  return Math.floor((g + REDISTRIBUTION_EPS) / MASS_STEP_G) * MASS_STEP_G;
+}
+
 // ─── Issue / warning types for the unified Issues card ───
 type Severity = "warning" | "error";
 interface Issue {
@@ -256,7 +260,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
         );
         return;
       }
-      const newMass = snapMass(Math.min(desired, shrinkCapacity));
+      const newMass = snapMassDown(Math.min(desired, shrinkCapacity));
       if (newMass <= REDISTRIBUTION_EPS) {
         setActionMsg(
           "Total mass is locked and the existing unlocked lines have less than 0.1 g of spare mass to give."
@@ -312,8 +316,10 @@ export default function FormulaDetailClient({ id }: { id: string }) {
    * Copies `rawMasses` into `baseMasses`, but only for the lines that actually
    * participated in a redistribution. Each participating line is snapped to the
    * slider step and clamped to its min/max bounds. Any rounding residual is then
-   * compensated onto participating lines with available capacity so the locked
-   * total remains exact while locked/unaffected lines stay untouched.
+   * compensated onto participating lines with available capacity. If the target
+   * total is from legacy off-step masses, normalize the participating lines'
+   * target sum to the slider step so the final controlled values stay stable
+   * while locked/unaffected lines stay untouched.
    */
   function applySnappedRedistribution(
     baseMasses: number[],
@@ -328,7 +334,11 @@ export default function FormulaDetailClient({ id }: { id: string }) {
       next[i] = clampLineMass(local.ingredientLines[i], snapMass(rawMasses[i]));
     }
 
-    let residual = targetTotal - next.reduce((sum, mass) => sum + mass, 0);
+    const unchangedTotal = baseMasses.reduce((sum, mass) => sum + mass, 0)
+      - adjustableIndexes.reduce((sum, i) => sum + baseMasses[i], 0);
+    const effectiveTargetTotal =
+      unchangedTotal + snapMass(targetTotal - unchangedTotal);
+    let residual = effectiveTargetTotal - next.reduce((sum, mass) => sum + mass, 0);
 
     for (
       let pass = 0;
@@ -1730,9 +1740,10 @@ function ConstraintDialog({
 // ─── Small radar sparkline (#11) ───
 // A 32×32 px filled radar of an ingredient's nutrition profile, drawn in the
 // ingredient's assigned color. Each axis is a tracked nutrient and is
-// normalised to that nutrient's own maximum across the ingredient's full
-// per-100 g profile so the polygon shape encodes "what's this ingredient
-// rich in?" rather than absolute magnitudes (which differ wildly by unit).
+// normalised by the single maximum value across this ingredient's tracked
+// nutrients so the polygon shape encodes "what's this ingredient rich in?"
+// within the displayed subset rather than absolute magnitudes (which differ
+// wildly by unit).
 function IngredientRadar({
   ingredient, trackedNutrients, color,
 }: {
@@ -1780,7 +1791,8 @@ function ComplianceBadge({
   status: "compliant" | "warning" | "non-compliant";
   compliance: ReturnType<typeof checkCompliance>;
 }) {
-  const offenders = compliance.deviations
+  const offenders = [...compliance.deviations]
+    .sort((a, b) => b.relDiffPct - a.relDiffPct)
     .map((d) => `${d.name} (${d.relDiffPct.toFixed(0)}%)`)
     .slice(0, 4)
     .join(", ");
