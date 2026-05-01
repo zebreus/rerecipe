@@ -163,6 +163,12 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   // Total mass is locked by default for newly created and legacy formulas
   // alike — the user can still toggle it off.
   const lockTotalMass = local.lockTotalMass ?? true;
+  const ingredientIndexById = new Map(ingredients.map((i, idx) => [i.id, idx]));
+  const ingredientColorById = new Map(
+    ingredients.map((i) => [i.id, ingredientColor(i.id, ingredientIndexById)])
+  );
+  const colorForIngredient = (ingredientId: string) =>
+    ingredientColorById.get(ingredientId) ?? ingredientColor(ingredientId, ingredientIndexById);
 
   function handleSaveClick() {
     if (hasTrials) setConfirmSaveOpen(true);
@@ -220,6 +226,16 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     const available = ingredients.find((i) => !used.has(i.id));
     if (!available) return;
 
+    if (local!.ingredientLines.length === 0) {
+      update({
+        ingredientLines: [
+          { ingredientId: available.id, massG: 10, locked: false },
+        ],
+      });
+      setActionMsg(null);
+      return;
+    }
+
     // When the total mass is locked, adding an ingredient must preserve the
     // total. Carve the new line's mass out of the existing unlocked lines
     // (proportionally). If there is no spare capacity at all, refuse.
@@ -240,9 +256,19 @@ export default function FormulaDetailClient({ id }: { id: string }) {
         return;
       }
       const newMass = snapMass(Math.min(desired, shrinkCapacity));
+      if (newMass <= REDISTRIBUTION_EPS) {
+        setActionMsg(
+          "Total mass is locked and the existing unlocked lines have less than 0.1 g of spare mass to give."
+        );
+        return;
+      }
       const masses = local!.ingredientLines.map((l) => l.massG);
-      const redistributed = distributeAcrossBoundedLines(masses, otherIndexes, -newMass)
-        .map(snapMass);
+      const redistributed = applySnappedRedistribution(
+        masses,
+        distributeAcrossBoundedLines(masses, otherIndexes, -newMass),
+        otherIndexes,
+        totalFormulaMassG(local!.ingredientLines) - newMass
+      );
       const updated = local!.ingredientLines.map((l, i) => ({ ...l, massG: redistributed[i] }));
       update({
         ingredientLines: [
@@ -274,6 +300,59 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   function clampLineMass(line: FormulaLine, mass: number): number {
     const { min, max } = lineBounds(line);
     return Math.max(min, Math.min(max, Number.isFinite(mass) ? mass : min));
+  }
+
+  function snapAndClampLineMass(index: number, mass: number): number {
+    return clampLineMass(local!.ingredientLines[index], snapMass(mass));
+  }
+
+  /**
+   * Copies `rawMasses` into `baseMasses`, but only for the lines that actually
+   * participated in a redistribution. Each participating line is snapped to the
+   * slider step and clamped to its min/max bounds. Any rounding residual is then
+   * compensated onto participating lines with available capacity so the locked
+   * total remains exact while locked/unaffected lines stay untouched.
+   */
+  function applySnappedRedistribution(
+    baseMasses: number[],
+    rawMasses: number[],
+    adjustableIndexes: number[],
+    targetTotal: number
+  ): number[] {
+    const next = [...baseMasses];
+    const uniqueAdjustable = [...new Set(adjustableIndexes)];
+
+    for (const i of uniqueAdjustable) {
+      next[i] = snapAndClampLineMass(i, rawMasses[i]);
+    }
+
+    let residual = targetTotal - next.reduce((sum, mass) => sum + mass, 0);
+
+    for (
+      let pass = 0;
+      pass < MAX_REDISTRIBUTION_PASSES && Math.abs(residual) > REDISTRIBUTION_EPS;
+      pass++
+    ) {
+      const candidates = uniqueAdjustable.filter((i) => {
+        const { min, max } = lineBounds(local!.ingredientLines[i]);
+        return residual > 0
+          ? next[i] < max - REDISTRIBUTION_EPS
+          : next[i] > min + REDISTRIBUTION_EPS;
+      });
+
+      if (candidates.length === 0) break;
+
+      const i = candidates[0];
+      const { min, max } = lineBounds(local!.ingredientLines[i]);
+      const applied = residual > 0
+        ? Math.min(residual, max - next[i])
+        : Math.max(residual, min - next[i]);
+
+      next[i] += applied;
+      residual -= applied;
+    }
+
+    return next;
   }
 
   /**
@@ -330,7 +409,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     const requestedMass = clampLineMass(lines[index], newMass);
 
     if (!lockTotalMass) {
-      const snapped = snapMass(requestedMass);
+      const snapped = snapAndClampLineMass(index, requestedMass);
       if (Math.abs(snapped - oldMass) < REDISTRIBUTION_EPS) return;
       const updated = lines.map((l, i) =>
         i === index ? { ...l, massG: snapped } : l
@@ -374,12 +453,15 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     masses[index] = oldMass + safeDelta;
     const redistributed = distributeAcrossBoundedLines(masses, otherIndexes, -safeDelta);
 
-    // Snap every value to the slider's step grain. Without this the
-    // controlled Radix Slider receives float values that don't snap to its
-    // step and emits onValueChange repeatedly to "correct" the position,
-    // causing React error #185 ("too many re-renders"). The total can drift
-    // by at most MASS_STEP_G per change which is well below MASS_TOLERANCE_G.
-    const snapped = redistributed.map(snapMass);
+    // Snap only the lines that changed, then compensate any rounding residual
+    // back onto those same lines. Locked/unaffected lines are left exactly as
+    // stored and the total remains fixed.
+    const snapped = applySnappedRedistribution(
+      lines.map((l) => l.massG),
+      redistributed,
+      [index, ...otherIndexes],
+      totalFormulaMassG(lines)
+    );
     const updated = lines.map((l, i) => ({ ...l, massG: snapped[i] }));
     update({ ingredientLines: updated });
   }
@@ -421,8 +503,13 @@ export default function FormulaDetailClient({ id }: { id: string }) {
       // stays put.
       const others = unlockedIndexesExcluding(index);
       const masses = lines.map((l) => l.massG);
-      const redistributed = distributeAcrossBoundedLines(masses, others, lines[index].massG)
-        .map(snapMass);
+      masses[index] = 0;
+      const redistributed = applySnappedRedistribution(
+        masses,
+        distributeAcrossBoundedLines(masses, others, lines[index].massG),
+        others,
+        totalFormulaMassG(lines)
+      );
       const next = lines
         .map((l, i) => ({ ...l, massG: redistributed[i] }))
         .filter((_, i) => i !== index);
@@ -554,7 +641,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
           severity: "warning",
           text: (
             <span>
-              <strong>{iss.ingredientName}</strong> is at rank #{iss.actualRank} by mass but the target expects it at rank #{iss.expectedRank}.
+              <strong>{iss.ingredientName}</strong> is line #{iss.actualRank} among target ingredients but the target expects it at line #{iss.expectedRank}.
             </span>
           ),
         });
@@ -614,10 +701,10 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   // across every chart on the page (#9, #10).
   const nutrientHeatmapData = trackedNutrients.map((n) => {
     const row: Record<string, number | string> = { name: `${n.name} (${n.unit})` };
-    for (const c of contributions) row[c.ingredientName] = c.values[n.name] ?? 0;
+    for (const c of contributions) row[c.ingredientId] = c.values[n.name] ?? 0;
     return row;
   });
-  const ingredientNamesInUse = contributions.map((c) => c.ingredientName);
+  const ingredientIdsInUse = contributions.map((c) => c.ingredientId);
   // Only ingredients actually present in the formula get a reference outline
   // on the radar — rendering one per global ingredient gets noisy and slow on
   // large libraries. Their colour is still keyed to the global index so it
@@ -815,7 +902,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                 <IngredientRadar
                                   ingredient={ing}
                                   trackedNutrients={trackedNutrients}
-                                  color={ingredientColor(line.ingredientId, ingredients)}
+                                  color={colorForIngredient(line.ingredientId)}
                                 />
                               </div>
                             </td>
@@ -972,7 +1059,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
           {/* Per-nutrient stacked breakdown: each row is a tracked nutrient
               and each segment shows how much of it comes from each
               ingredient, colored consistently with the radar charts. (#9) */}
-          {nutrientHeatmapData.length > 0 && ingredientNamesInUse.length > 0 && (
+          {nutrientHeatmapData.length > 0 && ingredientIdsInUse.length > 0 && (
             <Card className="print:hidden">
               <CardHeader>
                 <CardTitle className="text-base">Nutrient Sources</CardTitle>
@@ -991,9 +1078,10 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                     {contributions.map((c) => (
                       <Bar
                         key={c.ingredientId}
-                        dataKey={c.ingredientName}
+                        dataKey={c.ingredientId}
+                        name={c.ingredientName}
                         stackId="a"
-                        fill={ingredientColor(c.ingredientId, ingredients)}
+                        fill={colorForIngredient(c.ingredientId)}
                       />
                     ))}
                   </BarChart>
@@ -1106,7 +1194,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                         key={ing.id}
                         name={ing.name}
                         dataKey={`ing:${ing.id}`}
-                        stroke={ingredientColor(ing.id, ingredients)}
+                        stroke={colorForIngredient(ing.id)}
                         strokeOpacity={0.35}
                         fill="none"
                         strokeWidth={1}

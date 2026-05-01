@@ -255,8 +255,8 @@ export function checkCompliance(
 //  - A target ingredient is missing from the formula entirely.
 //  - An ingredient has a targetPct and the formula's actual mass% deviates
 //    by more than PCT_WARN_DIFF percentage points.
-//  - The ingredient ranking by mass% in the formula does not match the
-//    expected target order.
+//  - The ingredient line order in the formula does not match the expected
+//    target order.
 
 export interface IngredientOrderIssue {
   kind: "missing" | "pct-deviation" | "order-mismatch";

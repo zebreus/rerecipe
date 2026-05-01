@@ -103,13 +103,17 @@ const INGREDIENT_COLOR_PALETTE = [
 // Deterministic color for an ingredient based on its position in the global
 // `ingredients` array, so the same ingredient gets the same color across every
 // chart on a page.
+export function ingredientColorAtIndex(index: number): string {
+  return INGREDIENT_COLOR_PALETTE[Math.max(0, index) % INGREDIENT_COLOR_PALETTE.length];
+}
+
 export function ingredientColor(
   ingredientId: string,
-  ingredients: { id: string }[]
+  ingredientIndexById: ReadonlyMap<string, number>
 ): string {
-  const idx = ingredients.findIndex((i) => i.id === ingredientId);
-  if (idx < 0) return INGREDIENT_COLOR_PALETTE[0];
-  return INGREDIENT_COLOR_PALETTE[idx % INGREDIENT_COLOR_PALETTE.length];
+  const idx = ingredientIndexById.get(ingredientId);
+  if (idx === undefined || idx < 0) return INGREDIENT_COLOR_PALETTE[0];
+  return ingredientColorAtIndex(idx);
 }
 
 // An entry in the ordered list of expected ingredients for the target product.
