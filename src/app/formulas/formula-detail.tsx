@@ -718,8 +718,8 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     return row;
   });
   const ingredientIdsInUse = contributions.map((c) => c.ingredientId);
-  const ingredientIdsInUseSet = new Set(ingredientIdsInUse);
-  const usedIngredients = ingredients.filter((i) => ingredientIdsInUseSet.has(i.id));
+  const radarIngredientIds = new Set(ingredientIdsInUse);
+  const usedIngredients = ingredients.filter((i) => radarIngredientIds.has(i.id));
 
   // Radar data: one entry per tracked nutrient. Each axis is normalised
   // against the larger of (target, formula) so the polygons land on the
