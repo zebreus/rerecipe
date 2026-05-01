@@ -1504,7 +1504,7 @@ function MassInput({
     }
   }, [value]);
 
-  function commit(raw: string) {
+  function commit(raw: string, reformat: boolean) {
     const trimmed = raw.trim();
     if (trimmed === "") {
       setDraft(String(value));
@@ -1517,8 +1517,9 @@ function MassInput({
     }
     lastExternal.current = parsed;
     onCommit(parsed);
-    // Don't reformat while still focused — that would jump the cursor.
-    if (!focusedRef.current) setDraft(String(parsed));
+    // Only reformat the buffer when the field is no longer focused — doing
+    // it mid-edit would jump the cursor and undo what the user just typed.
+    if (reformat) setDraft(String(parsed));
   }
 
   return (
@@ -1534,11 +1535,11 @@ function MassInput({
       onChange={(e) => setDraft(e.target.value)}
       onBlur={(e) => {
         focusedRef.current = false;
-        commit(e.target.value);
+        commit(e.target.value, true);
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
-          commit((e.target as HTMLInputElement).value);
+          commit((e.target as HTMLInputElement).value, false);
         }
       }}
     />
