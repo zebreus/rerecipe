@@ -375,7 +375,7 @@ export function checkIngredientOrderCompliance(
 // Algorithm: projected gradient descent on the ingredient-fraction simplex
 // with multiple random restarts; the best run wins.
 export interface SolverConfig {
-  restarts?: number;        // independent restarts (default 1)
+  restarts?: number;        // independent restarts (default 8)
   orderingWeight?: number;  // soft penalty weight for line-order preference
   honorTotalMass?: boolean; // when false the unlocked sum is unconstrained
 }
@@ -387,7 +387,7 @@ export function runFormulaOptimizer(
   targetMassG: number,
   config: SolverConfig = {}
 ): FormulaLine[] {
-  const restarts = Math.max(1, config.restarts ?? 1);
+  const restarts = Math.max(1, config.restarts ?? 8);
   const orderingWeight = Math.max(0, config.orderingWeight ?? 0);
   const honorTotalMass = config.honorTotalMass !== false;
 

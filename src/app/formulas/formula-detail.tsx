@@ -621,10 +621,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                 <SelectTrigger className="h-8 print:hidden">
                                   <SelectValue />
                                 </SelectTrigger>
-                                <span
-                                  className="hidden print:block"
-                                  aria-label={`Ingredient: ${ing?.name ?? line.ingredientId}`}
-                                >
+                                <span className="hidden print:block">
                                   {ing?.name ?? line.ingredientId}
                                 </span>
                                 <SelectContent>
@@ -656,10 +653,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                   onChange={(e) => setLineMass(idx, Number(e.target.value))}
                                   disabled={line.locked}
                                 />
-                                <span
-                                  className="hidden print:block tabular-nums"
-                                  aria-label={`Mass in grams: ${line.massG.toFixed(1)}`}
-                                >
+                                <span className="hidden print:block tabular-nums">
                                   {line.massG.toFixed(1)}
                                 </span>
                                 {hasConstraint && (
