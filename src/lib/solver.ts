@@ -365,22 +365,32 @@ export function checkIngredientOrderCompliance(
   };
 }
 // ─── Formula Optimizer (Solver) ───
-// Adjusts masses of *unlocked* ingredient lines to minimise the sum of
-// squared deviations between the calculated per-100 g nutrition and the
-// target values.  Locked lines are held fixed.
+// Adjusts masses of *unlocked* ingredient lines to minimise:
+//   (a) sum of squared deviations between calculated per-100 g nutrition and
+//       the target values, and
+//   (b) an ordering penalty that prefers solutions where each line's mass is
+//       ≤ the previous line's mass (matching the order of ingredientLines).
+// Locked lines are held fixed. Per-line minG/maxG bounds are honoured.
 //
-// Algorithm: projected gradient descent on the ingredient-fraction simplex.
-//   - fractions p_j = x_j / budget  (budget = targetMassG − locked mass)
-//   - gradient projected onto the tangent space of the simplex at each step
-//   - non-negativity enforced by clipping, then re-normalised to sum = 1
-//
-// Returns a new array of FormulaLines with updated masses.
+// Algorithm: projected gradient descent on the ingredient-fraction simplex
+// with multiple random restarts; the best run wins.
+export interface SolverConfig {
+  restarts?: number;        // independent restarts (default 8)
+  orderingWeight?: number;  // soft penalty weight for line-order preference
+  honorTotalMass?: boolean; // when false the unlocked sum is unconstrained
+}
+
 export function runFormulaOptimizer(
   lines: FormulaLine[],
   ingredients: Ingredient[],
   target: NutritionalValue[],
-  targetMassG: number
+  targetMassG: number,
+  config: SolverConfig = {}
 ): FormulaLine[] {
+  const restarts = Math.max(1, config.restarts ?? 8);
+  const orderingWeight = Math.max(0, config.orderingWeight ?? 0);
+  const honorTotalMass = config.honorTotalMass !== false;
+
   const locked = lines.filter((l) => l.locked);
   const unlocked = lines.filter((l) => !l.locked);
 
@@ -389,8 +399,6 @@ export function runFormulaOptimizer(
   const lockedMass = locked.reduce((sum, l) => sum + l.massG, 0);
   const rawBudget = targetMassG - lockedMass;
 
-  // If locked lines already consume all (or more than) the target mass, set
-  // every unlocked line to 0 — there is nothing left to allocate.
   if (rawBudget <= 0) {
     return lines.map((l) => (l.locked ? l : { ...l, massG: 0 }));
   }
@@ -401,8 +409,6 @@ export function runFormulaOptimizer(
     ingredients.map((i) => [i.id, i])
   );
 
-  // Only optimise against nutrients that have a nonzero target or at least one
-  // ingredient with a nonzero value (otherwise they are uninformative).
   const activeNutrients = target.filter((n) => {
     if (n.per100g !== 0) return true;
     return unlocked.some((l) => {
@@ -413,8 +419,7 @@ export function runFormulaOptimizer(
 
   const J = unlocked.length;
 
-  if (activeNutrients.length === 0) {
-    // No signal — distribute budget evenly among unlocked lines.
+  if (activeNutrients.length === 0 && orderingWeight === 0) {
     const evenMass = round2(budget / J);
     return lines.map((l) => (l.locked ? l : { ...l, massG: evenMass }));
   }
@@ -429,7 +434,6 @@ export function runFormulaOptimizer(
     })
   );
 
-  // Absolute nutrient contribution from locked lines
   const lockedContrib: number[] = activeNutrients.map((n) =>
     locked.reduce((sum, l) => {
       const ing = ingById.get(l.ingredientId);
@@ -437,71 +441,148 @@ export function runFormulaOptimizer(
     }, 0)
   );
 
-  // RHS of the per-fraction linear system:
-  // sum_j(p_j * A[i][j]) should equal rhs[i]
-  // rhs[i] = (target_i * targetMassG / 100 - lockedContrib[i]) * 100 / budget
   const rhs: number[] = activeNutrients.map(
     (n, i) => ((n.per100g * targetMassG) / 100 - lockedContrib[i]) * 100 / budget
   );
 
-  // Initialise fractions from current masses (fall back to even distribution).
+  // Per-fraction bounds derived from per-line minG/maxG (relative to budget).
+  const minP = unlocked.map((l) =>
+    typeof l.minG === "number" ? Math.max(0, Math.min(1, l.minG / budget)) : 0
+  );
+  const maxP = unlocked.map((l) =>
+    typeof l.maxG === "number" ? Math.max(0, Math.min(1, l.maxG / budget)) : 1
+  );
+  // If bounds are inconsistent (min > max) clamp max up to min so the
+  // solver doesn't deadlock; the UI surfaces this as a warning.
+  for (let j = 0; j < J; j++) {
+    if (maxP[j] < minP[j]) maxP[j] = minP[j];
+  }
+
+  // Initial point honouring bounds; prefer current masses.
   const currentTotal = unlocked.reduce((s, l) => s + l.massG, 0);
-  let p: number[] =
+  const initial: number[] =
     currentTotal > 0
       ? unlocked.map((l) => l.massG / currentTotal)
       : unlocked.map(() => 1 / J);
 
-  // 400 iterations is sufficient for practical food formulations (typically
-  // ≤ 15 ingredients, ≤ 10 nutrients).  Most problems converge within 100
-  // iterations; the extra headroom handles ill-conditioned matrices without a
-  // significant runtime cost (each iteration is O(J*N) ≈ O(150) ops).
-  const MAX_ITER = 400;
-  // Normalise learning rate by the typical scale of A to improve convergence.
-  const aMax = A.flat().reduce((m, v) => Math.max(m, Math.abs(v)), 1);
-  const lr0 = 0.5 / (aMax * aMax * N);
-
-  for (let iter = 0; iter < MAX_ITER; iter++) {
-    // Residuals r[i] = sum_j(p[j]*A[i][j]) - rhs[i]
-    const r: number[] = activeNutrients.map((_, i) =>
-      p.reduce((sum, pj, j) => sum + pj * A[i][j], 0) - rhs[i]
-    );
-
-    // L2 loss gradient w.r.t. p[j]: g[j] = 2 * sum_i(r[i] * A[i][j])
-    const g: number[] = p.map((_, j) =>
-      2 * r.reduce((sum, ri, i) => sum + ri * A[i][j], 0)
-    );
-
-    // Project gradient onto simplex tangent (subtract mean so step stays on simplex)
-    const meanG = g.reduce((s, v) => s + v, 0) / J;
-    const projG = g.map((v) => v - meanG);
-
-    // Step, clip to non-negative, renormalise
-    const lr = lr0 / (1 + iter * 0.005);
-    const raw = p.map((pj, j) => Math.max(0, pj - lr * projG[j]));
-    const sumRaw = raw.reduce((s, v) => s + v, 0);
-    p = sumRaw > 1e-12 ? raw.map((v) => v / sumRaw) : p;
-
-    // Early exit when residuals are negligible
-    const loss = r.reduce((s, ri) => s + ri * ri, 0);
-    if (loss < 1e-8) break;
+  // Helper: clip to [minP, maxP] then renormalise to sum 1 (when honouring
+  // total mass). Best-effort: we run a few rebalance passes since clipping
+  // can violate the simplex constraint.
+  function clipAndNormalise(v: number[]): number[] {
+    let out = v.map((x, j) => Math.max(minP[j], Math.min(maxP[j], x)));
+    if (!honorTotalMass) return out.map((x) => Math.max(0, x));
+    for (let pass = 0; pass < 20; pass++) {
+      const sum = out.reduce((s, x) => s + x, 0);
+      if (Math.abs(sum - 1) < 1e-9) break;
+      // Distribute the deficit/surplus over lines that still have headroom
+      const slack = out.map((x, j) =>
+        sum < 1 ? Math.max(0, maxP[j] - x) : Math.max(0, x - minP[j])
+      );
+      const totalSlack = slack.reduce((s, x) => s + x, 0);
+      if (totalSlack < 1e-12) break;
+      const delta = 1 - sum;
+      out = out.map((x, j) =>
+        Math.max(minP[j], Math.min(maxP[j], x + (delta * slack[j]) / totalSlack))
+      );
+    }
+    return out;
   }
 
-  // Convert fractions back to masses. Round all but the last unlocked line and
-  // assign the remainder to the last to ensure the unlocked masses sum exactly
-  // to `budget` (preventing cumulative rounding drift).
+  function loss(p: number[]): number {
+    let l = 0;
+    for (let i = 0; i < N; i++) {
+      let r = -rhs[i];
+      for (let j = 0; j < J; j++) r += p[j] * A[i][j];
+      l += r * r;
+    }
+    if (orderingWeight > 0) {
+      // Penalise inversions: each adjacent pair where p[j+1] > p[j].
+      for (let j = 0; j < J - 1; j++) {
+        const d = p[j + 1] - p[j];
+        if (d > 0) l += orderingWeight * d * d;
+      }
+    }
+    return l;
+  }
+
+  function gradient(p: number[]): number[] {
+    const g = new Array<number>(J).fill(0);
+    // Nutrition gradient: 2 * sum_i (r_i * A[i][j])
+    for (let i = 0; i < N; i++) {
+      let r = -rhs[i];
+      for (let j = 0; j < J; j++) r += p[j] * A[i][j];
+      const two_r = 2 * r;
+      for (let j = 0; j < J; j++) g[j] += two_r * A[i][j];
+    }
+    if (orderingWeight > 0) {
+      for (let j = 0; j < J - 1; j++) {
+        const d = p[j + 1] - p[j];
+        if (d > 0) {
+          const grad = 2 * orderingWeight * d;
+          g[j] -= grad;
+          g[j + 1] += grad;
+        }
+      }
+    }
+    return g;
+  }
+
+  const aMax = A.flat().reduce((m, v) => Math.max(m, Math.abs(v)), 1);
+  const denom = (aMax * aMax * Math.max(1, N)) + orderingWeight;
+  const lr0 = 0.5 / denom;
+  const MAX_ITER = 600;
+
+  function runOnce(start: number[]): { p: number[]; loss: number } {
+    let p = clipAndNormalise(start);
+    for (let iter = 0; iter < MAX_ITER; iter++) {
+      const g = gradient(p);
+      let step: number[];
+      if (honorTotalMass) {
+        // Project gradient onto simplex tangent.
+        const meanG = g.reduce((s, v) => s + v, 0) / J;
+        step = g.map((v) => v - meanG);
+      } else {
+        step = g;
+      }
+      const lr = lr0 / (1 + iter * 0.005);
+      const raw = p.map((pj, j) => pj - lr * step[j]);
+      p = clipAndNormalise(raw);
+      const l = loss(p);
+      if (l < 1e-9) break;
+    }
+    return { p, loss: loss(p) };
+  }
+
+  // Multi-restart: first run from the current point, then several random.
+  let best = runOnce(initial);
+  for (let r = 1; r < restarts; r++) {
+    const seed = unlocked.map((_, j) => {
+      const lo = minP[j];
+      const hi = Math.max(lo, maxP[j]);
+      return lo + Math.random() * (hi - lo);
+    });
+    const candidate = runOnce(seed);
+    if (candidate.loss < best.loss) best = candidate;
+  }
+
+  const p = best.p;
+
+  // Convert fractions back to masses, honouring exact budget when requested.
   const rawMasses = p.map((pj) => Math.max(0, pj * budget));
   const unlockedWithMasses = unlocked.map((l, j) => {
     let massG: number;
-    if (j < unlocked.length - 1) {
+    if (!honorTotalMass || j < unlocked.length - 1) {
       massG = round2(rawMasses[j]);
     } else {
-      // Last line gets the remainder to preserve the exact budget sum.
       const allocated = unlocked
         .slice(0, j)
         .reduce((sum, _, k) => sum + round2(rawMasses[k]), 0);
       massG = round2(Math.max(0, budget - allocated));
     }
-    return { ...l, massG };
+    // Clamp to per-line absolute bounds as a final safety.
+    if (typeof l.minG === "number") massG = Math.max(massG, l.minG);
+    if (typeof l.maxG === "number") massG = Math.min(massG, l.maxG);
+    return { ...l, massG: round2(massG) };
   });
 
   let ui = 0;

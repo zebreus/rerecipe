@@ -116,7 +116,6 @@ function FormulasListView() {
       name: newName.trim(),
       description: newDesc.trim(),
       version: 1,
-      targetMassG,
       ingredientLines,
       calculatedNutrition: {},
       totalMassG: 0,
@@ -198,7 +197,7 @@ function FormulasListView() {
           data.targetProduct.targetNutrition
         ),
         totalMassG: totalFormulaMassG(lines),
-        massBalance: calculateMassBalance(lines, f.targetMassG),
+        massBalance: calculateMassBalance(lines, data.targetProduct.targetMassG),
         createdAt: now,
         updatedAt: now,
       };
@@ -288,7 +287,7 @@ function FormulasListView() {
             );
             const mb = calculateMassBalance(
               f.ingredientLines,
-              f.targetMassG
+              data.targetProduct.targetMassG
             );
             const sim = nutritionSimilarity(
               calc,
