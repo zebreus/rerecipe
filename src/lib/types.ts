@@ -112,7 +112,7 @@ export function ingredientColor(
   ingredientIndexById: ReadonlyMap<string, number>
 ): string {
   const idx = ingredientIndexById.get(ingredientId);
-  if (idx === undefined || idx < 0) return INGREDIENT_COLOR_PALETTE[0];
+  if (idx === undefined) return INGREDIENT_COLOR_PALETTE[0];
   return ingredientColorAtIndex(idx);
 }
 

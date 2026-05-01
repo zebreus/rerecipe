@@ -221,12 +221,13 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   }
 
   function addLine() {
+    if (!local) return;
     if (ingredients.length === 0) return;
-    const used = new Set(local!.ingredientLines.map((l) => l.ingredientId));
+    const used = new Set(local.ingredientLines.map((l) => l.ingredientId));
     const available = ingredients.find((i) => !used.has(i.id));
     if (!available) return;
 
-    if (local!.ingredientLines.length === 0) {
+    if (local.ingredientLines.length === 0) {
       update({
         ingredientLines: [
           { ingredientId: available.id, massG: 10, locked: false },
@@ -241,13 +242,13 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     // (proportionally). If there is no spare capacity at all, refuse.
     if (lockTotalMass) {
       const desired = 10;
-      const otherIndexes = local!.ingredientLines
+      const otherIndexes = local.ingredientLines
         .map((l, i) => ({ l, i }))
         .filter(({ l }) => !l.locked)
         .map(({ i }) => i);
       const shrinkCapacity = otherIndexes.reduce((sum, i) => {
-        const { min } = lineBounds(local!.ingredientLines[i]);
-        return sum + Math.max(0, local!.ingredientLines[i].massG - min);
+        const { min } = lineBounds(local.ingredientLines[i]);
+        return sum + Math.max(0, local.ingredientLines[i].massG - min);
       }, 0);
       if (shrinkCapacity <= REDISTRIBUTION_EPS) {
         setActionMsg(
@@ -262,14 +263,14 @@ export default function FormulaDetailClient({ id }: { id: string }) {
         );
         return;
       }
-      const masses = local!.ingredientLines.map((l) => l.massG);
+      const masses = local.ingredientLines.map((l) => l.massG);
       const redistributed = applySnappedRedistribution(
         masses,
         distributeAcrossBoundedLines(masses, otherIndexes, -newMass),
         otherIndexes,
-        totalFormulaMassG(local!.ingredientLines) - newMass
+        totalFormulaMassG(local.ingredientLines) - newMass
       );
-      const updated = local!.ingredientLines.map((l, i) => ({ ...l, massG: redistributed[i] }));
+      const updated = local.ingredientLines.map((l, i) => ({ ...l, massG: redistributed[i] }));
       update({
         ingredientLines: [
           ...updated,
@@ -282,7 +283,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
 
     update({
       ingredientLines: [
-        ...local!.ingredientLines,
+        ...local.ingredientLines,
         { ingredientId: available.id, massG: 10, locked: false },
       ],
     });
@@ -320,9 +321,8 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     targetTotal: number
   ): number[] {
     const next = [...baseMasses];
-    const uniqueAdjustable = [...new Set(adjustableIndexes)];
 
-    for (const i of uniqueAdjustable) {
+    for (const i of adjustableIndexes) {
       next[i] = snapAndClampLineMass(i, rawMasses[i]);
     }
 
@@ -333,7 +333,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
       pass < MAX_REDISTRIBUTION_PASSES && Math.abs(residual) > REDISTRIBUTION_EPS;
       pass++
     ) {
-      const candidates = uniqueAdjustable.filter((i) => {
+      const candidates = adjustableIndexes.filter((i) => {
         const { min, max } = lineBounds(local!.ingredientLines[i]);
         return residual > 0
           ? next[i] < max - REDISTRIBUTION_EPS
@@ -641,7 +641,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
           severity: "warning",
           text: (
             <span>
-              <strong>{iss.ingredientName}</strong> is line #{iss.actualRank} among target ingredients but the target expects it at line #{iss.expectedRank}.
+              <strong>{iss.ingredientName}</strong> appears at line #{iss.actualRank} among target ingredients but the target expects line #{iss.expectedRank}.
             </span>
           ),
         });
