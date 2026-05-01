@@ -541,6 +541,11 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                         const ing = ingredients.find((i) => i.id === line.ingredientId);
                         const lineCost = ing ? (line.massG * ing.costPerKg) / 1000 : 0;
                         const hasConstraint = line.minG !== undefined || line.maxG !== undefined;
+                        // Effective slider/input bounds — driven by per-line constraints
+                        // when present, otherwise by the table's overall slider max.
+                        const effectiveMin = Math.max(0, line.minG ?? 0);
+                        const effectiveMax = Math.min(sliderMax, line.maxG ?? sliderMax);
+                        const sliderValue = Math.max(effectiveMin, Math.min(effectiveMax, line.massG));
                         return (
                           <tr key={idx} className="border-b last:border-0">
                             <td className="py-2 pr-2 w-40">
@@ -561,10 +566,10 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                             <td className="py-2 pr-2">
                               <div className="flex items-center gap-2">
                                 <Slider
-                                  min={Math.max(0, line.minG ?? 0)}
-                                  max={Math.min(sliderMax, line.maxG ?? sliderMax)}
+                                  min={effectiveMin}
+                                  max={effectiveMax}
                                   step={0.1}
-                                  value={[Math.max(line.minG ?? 0, Math.min(line.maxG ?? sliderMax, line.massG))]}
+                                  value={[sliderValue]}
                                   onValueChange={([val]) => setLineMass(idx, val)}
                                   className="w-24 shrink-0 print:hidden"
                                   disabled={line.locked}
@@ -777,6 +782,8 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                       relPct <= DEVIATION_LOW_PCT ? "text-green-600 dark:text-green-400"
                       : relPct <= DEVIATION_HIGH_PCT ? "text-yellow-600 dark:text-yellow-400"
                       : "text-red-600 dark:text-red-400";
+                    const diffSign = diff >= 0 ? "+" : "";
+                    const pctSign = diff >= 0 ? "+" : "-";
                     return (
                       <div key={n.name} className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center">
                         <span className="flex items-center gap-1.5 truncate">
@@ -789,7 +796,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                         <span className={`text-right tabular-nums text-xs ${diffColor}`}>
                           {targetVal === 0 && formulaVal === 0
                             ? "—"
-                            : `${diff >= 0 ? "+" : ""}${diff.toFixed(1)} (${diff >= 0 ? "+" : "-"}${relPct.toFixed(0)}%)`}
+                            : `${diffSign}${diff.toFixed(1)} (${pctSign}${relPct.toFixed(0)}%)`}
                         </span>
                       </div>
                     );
@@ -806,6 +813,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                   (() => {
                     const diff = totalMass - targetMassG;
                     const pct = (diff / targetMassG) * 100;
+                    const sign = diff >= 0 ? "+" : "";
                     const color =
                       Math.abs(pct) <= 1 ? "text-green-600 dark:text-green-400"
                       : Math.abs(pct) <= 5 ? "text-yellow-600 dark:text-yellow-400"
@@ -814,7 +822,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                       <span className={`text-right tabular-nums text-xs ${color}`}>
                         {Math.abs(diff) <= MASS_TOLERANCE_G
                           ? "—"
-                          : `${diff >= 0 ? "+" : ""}${diff.toFixed(1)} (${diff >= 0 ? "+" : ""}${pct.toFixed(1)}%)`}
+                          : `${sign}${diff.toFixed(1)} (${sign}${pct.toFixed(1)}%)`}
                       </span>
                     );
                   })()

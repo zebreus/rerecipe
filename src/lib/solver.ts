@@ -387,7 +387,7 @@ export function runFormulaOptimizer(
   targetMassG: number,
   config: SolverConfig = {}
 ): FormulaLine[] {
-  const restarts = Math.max(1, config.restarts ?? 8);
+  const restarts = Math.max(1, config.restarts ?? 1);
   const orderingWeight = Math.max(0, config.orderingWeight ?? 0);
   const honorTotalMass = config.honorTotalMass !== false;
 
