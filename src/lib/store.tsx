@@ -466,7 +466,7 @@ function recalcFormulaObj(
     ingredients,
     target.targetNutrition
   );
-  const massBalance = calculateMassBalance(f.ingredientLines, f.targetMassG);
+  const massBalance = calculateMassBalance(f.ingredientLines, target.targetMassG);
   return {
     ...f,
     calculatedNutrition,

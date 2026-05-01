@@ -194,7 +194,6 @@ export function createSeedData(): ProjectData {
       name: "Candidate A – Milk-heavy",
       description: "High milk ratio with cream for richness",
       version: 1,
-      targetMassG: 200,
       ingredientLines: [
         { ingredientId: "ing-1", massG: 130, locked: false },
         { ingredientId: "ing-2", massG: 35, locked: false },
@@ -786,7 +785,7 @@ export function createSeedData(): ProjectData {
     );
     formula.massBalance = calculateMassBalance(
       formula.ingredientLines,
-      formula.targetMassG
+      data.targetProduct.targetMassG
     );
     formula.confidence =
       nutritionSimilarity(

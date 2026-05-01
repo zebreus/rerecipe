@@ -41,20 +41,46 @@ body {
   animation: fadeOut 150ms ease-in, zoomOut 150ms ease-in;
 }
 
-/* Print styles */
+/* Print styles: produce a clean light-mode printable summary so users can
+   right-click → Print without needing a dedicated button. Hides interactive
+   controls (sliders, dropdowns, navigation) and forces a white background. */
 @media print {
+  :root {
+    --background: #ffffff;
+    --foreground: #000000;
+  }
+  /* Hide site chrome and interactive controls. */
   aside,
   nav,
-  .lg\:hidden,
-  button {
+  button,
+  input,
+  select,
+  textarea,
+  [role="slider"],
+  [role="combobox"],
+  .lg\:hidden {
+    display: none !important;
+  }
+  /* Anything explicitly marked as print-hidden. */
+  .print\:hidden {
     display: none !important;
   }
   body {
     background: white !important;
     color: black !important;
   }
+  /* Force light text/borders in printed cards regardless of dark-mode classes. */
+  body * {
+    color: black !important;
+    background-color: transparent !important;
+    border-color: #999 !important;
+  }
   main {
     padding: 0 !important;
     margin: 0 !important;
   }
+  /* Reveal print-only content (hidden in screen view). */
+  .print\:block { display: block !important; }
+  /* Avoid breaking cards across pages where possible. */
+  .rounded-lg, table { break-inside: avoid; }
 }

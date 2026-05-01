@@ -131,9 +131,30 @@ export interface FormulaLine {
   ingredientId: string;
   massG: number;
   locked: boolean;
+  // Optional inclusive bounds (grams) the solver and slider must respect.
   minG?: number;
   maxG?: number;
 }
+
+// Solver settings; persisted on a Formula so each formula can have its own.
+export interface SolverSettings {
+  // Number of independent random restarts. More restarts → more aggressive
+  // search but slower. 1 = no restart (just one run from current masses).
+  restarts: number;
+  // Soft penalty weight for keeping ingredient masses in descending order
+  // matching the ingredient-line order on the formula. 0 = ignore order.
+  orderingWeight: number;
+  // When false the solver just minimises nutrition deviation regardless of
+  // total mass. When true it constrains the unlocked sum to fit the budget
+  // (this is the default behaviour and matches the historic solver).
+  honorTotalMass: boolean;
+}
+
+export const DEFAULT_SOLVER_SETTINGS: SolverSettings = {
+  restarts: 8,
+  orderingWeight: 0.5,
+  honorTotalMass: true,
+};
 
 export interface MassBalance {
   totalInputG: number;
@@ -153,8 +174,14 @@ export interface Formula {
   name: string;
   description: string;
   version: number;
-  targetMassG: number;
   ingredientLines: FormulaLine[];
+  // When true, sliders proportionally rescale the other unlocked lines to
+  // preserve the current total mass of the formula.
+  lockTotalMass?: boolean;
+  // Keys of warnings the user has chosen to hide on this formula.
+  ignoredWarnings?: string[];
+  // Per-formula solver settings. Falls back to DEFAULT_SOLVER_SETTINGS.
+  solverSettings?: SolverSettings;
   // Per-100g nutritional values for the formula, keyed by nutrient name.
   calculatedNutrition: CalculatedNutrition;
   totalMassG: number;
