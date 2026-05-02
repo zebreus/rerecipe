@@ -102,7 +102,13 @@ function nutrientAxisMax(
   formulaVal = 0,
 ): number {
   const target = n.per100g;
-  if (target > 0) return target * (n.displayScale ?? DEFAULT_DISPLAY_SCALE);
+  const displayScale =
+    typeof n.displayScale === "number" &&
+    Number.isFinite(n.displayScale) &&
+    n.displayScale > 0
+      ? n.displayScale
+      : DEFAULT_DISPLAY_SCALE;
+  if (target > 0) return target * displayScale;
   return Math.max(formulaVal, MIN_DEVIATION_DENOM);
 }
 // Mass tolerance (g) below which the formula total is considered to match.
@@ -958,6 +964,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                 <IngredientRadar
                                   ingredient={ing}
                                   trackedNutrients={trackedNutrients}
+                                  formulaNutrition={calc}
                                   color={colorForIngredient(line.ingredientId)}
                                 />
                               </div>
@@ -1193,10 +1200,10 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                 <CardTitle className="text-base">Nutrition Profile</CardTitle>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Each axis is one tracked nutrient, scaled so the outer ring
-                  is {DEFAULT_DISPLAY_SCALE.toFixed(1)}× the target value
-                  (configurable per nutrient on the Target page). Ingredient
-                  outlines are drawn at {INGREDIENT_RADAR_MASS_G}&nbsp;g for
-                  reference. Hover for absolute values.
+                  is the nutrient&apos;s configured target multiplier
+                  ({DEFAULT_DISPLAY_SCALE}× by default). Ingredient outlines
+                  are drawn at {INGREDIENT_RADAR_MASS_G}&nbsp;g for reference.
+                  Hover for absolute values.
                 </p>
               </CardHeader>
               <CardContent>
@@ -1944,17 +1951,19 @@ function ConstraintDialog({
 // hover tooltip still reports per-100 g values for parity with the rest of
 // the UI. (#5, #6)
 function IngredientRadar({
-  ingredient, trackedNutrients, color,
+  ingredient, trackedNutrients, formulaNutrition, color,
 }: {
   ingredient: { nutrition: Record<string, number> } | undefined;
   trackedNutrients: { name: string; per100g: number; displayScale?: number; unit?: string }[];
+  formulaNutrition: Record<string, number>;
   color: string;
 }) {
   if (!ingredient || trackedNutrients.length < 3) return null;
   const data = trackedNutrients.map((n) => {
     const per100g = ingredient.nutrition?.[n.name] ?? 0;
     const at50g = per100g * (INGREDIENT_RADAR_MASS_G / 100);
-    const axisMax = nutrientAxisMax(n);
+    const formulaVal = formulaNutrition[n.name] ?? 0;
+    const axisMax = nutrientAxisMax(n, formulaVal);
     return {
       nutrient: n.name,
       v: Math.min(1, at50g / axisMax),
