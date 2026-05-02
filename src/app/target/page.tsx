@@ -22,6 +22,7 @@ import {
   type TargetIngredient,
   COMMON_NUTRITION_OPTIONS,
   COMMON_NUTRITION_UNITS,
+  DEFAULT_DISPLAY_SCALE,
   nutritionColor,
 } from "@/lib/types";
 import {
@@ -71,6 +72,19 @@ export default function TargetPage() {
       ...target,
       targetNutrition: target.targetNutrition.map((n) =>
         n.name === name ? { ...n, per100g: val } : n
+      ),
+    });
+    setDirty(true);
+  }
+
+  function updateNutritionDisplayScale(name: string, val: number) {
+    // Clamp to a sensible range so a 0 or negative scale can't make the
+    // chart-axis maximum collapse to 0 (which would blow up the radar).
+    const safe = Number.isFinite(val) && val > 0 ? val : DEFAULT_DISPLAY_SCALE;
+    setTarget({
+      ...target,
+      targetNutrition: target.targetNutrition.map((n) =>
+        n.name === name ? { ...n, displayScale: safe } : n
       ),
     });
     setDirty(true);
@@ -288,6 +302,12 @@ export default function TargetPage() {
                 <CardTitle className="text-base">
                   Target Nutritional Values (per 100&nbsp;g)
                 </CardTitle>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  The <em>scale</em> column controls how much of the formula
+                  charts each nutrient occupies — the chart axis maxes out at
+                  <code className="mx-1">target × scale</code>. Defaults to
+                  {" "}{DEFAULT_DISPLAY_SCALE.toFixed(1)}.
+                </p>
               </CardHeader>
               <CardContent className="space-y-3">
                 {target.targetNutrition.length === 0 && (
@@ -319,6 +339,24 @@ export default function TargetPage() {
                     />
                     <span className="text-xs text-gray-400 dark:text-gray-500 w-8">
                       {n.unit}
+                    </span>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      className="w-16"
+                      title={`Chart axis maximum = target × this scale (default ${DEFAULT_DISPLAY_SCALE.toFixed(1)})`}
+                      aria-label={`${n.name} display scale`}
+                      value={n.displayScale ?? DEFAULT_DISPLAY_SCALE}
+                      onChange={(e) =>
+                        updateNutritionDisplayScale(
+                          n.name,
+                          Number(e.target.value)
+                        )
+                      }
+                    />
+                    <span className="text-xs text-gray-400 dark:text-gray-500 w-8">
+                      ×
                     </span>
                     <Button
                       variant="ghost"

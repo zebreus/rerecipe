@@ -70,7 +70,9 @@ function isValidTargetNutritionEntry(value: unknown): boolean {
   return (
     typeof value.name === "string" &&
     typeof value.unit === "string" &&
-    isFiniteNumber(value.per100g)
+    isFiniteNumber(value.per100g) &&
+    (value.displayScale === undefined ||
+      (isFiniteNumber(value.displayScale) && value.displayScale > 0))
   );
 }
 

@@ -18,12 +18,20 @@ export interface ObservedAttributes {
 // Each nutritional value is identified by its `name` (the id/key within a
 // project's target). The `unit` is a short unit specifier like "kcal" or "g".
 // `per100g` is the value per 100 g of the substance (the target product, or
-// an ingredient).
+// an ingredient). `displayScale` (target only) is the multiplier applied to
+// `per100g` to derive the maximum value shown for this nutrient on the
+// formula radar / bar charts. Defaults to `DEFAULT_DISPLAY_SCALE` (1.3) when
+// undefined, so each axis maxes out at 130 % of target by default.
 export interface NutritionalValue {
   name: string;
   unit: string;
   per100g: number;
+  displayScale?: number;
 }
+
+// Default factor applied to a nutrient's target value to compute the chart
+// axis maximum. Exposed so UI defaults stay in sync with consumers.
+export const DEFAULT_DISPLAY_SCALE = 1.3;
 
 // Default target nutritional values, based on the German "Nährwertangaben"
 // standard (translated to English). Used when creating a new project.

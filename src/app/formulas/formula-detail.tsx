@@ -53,7 +53,7 @@ import type {
   Trial,
   SolverSettings,
 } from "@/lib/types";
-import { nutritionColor, ingredientColor, ingredientColorAtIndex, DEFAULT_SOLVER_SETTINGS } from "@/lib/types";
+import { nutritionColor, ingredientColor, ingredientColorAtIndex, DEFAULT_SOLVER_SETTINGS, DEFAULT_DISPLAY_SCALE } from "@/lib/types";
 import {
   calculateFormulaNutrition,
   calculateMassBalance,
@@ -87,6 +87,30 @@ const DEVIATION_LOW_PCT = 10; // ≤ this → green (no warning)
 const DEVIATION_HIGH_PCT = 25; // > this → red (hard warning)
 // Minimum denominator to avoid division-by-zero in relative-error calculations.
 const MIN_DEVIATION_DENOM = 1e-3;
+// Mass (g) used to render ingredient outlines on the formula radar charts.
+// Targets and computed formulas are per 100 g, but ingredient profiles are
+// shown for reference only — at half the size so they don't visually drown
+// out the formula/target shapes. (#10)
+const INGREDIENT_RADAR_MASS_G = 50;
+
+// Axis maximum (in absolute units) for a tracked nutrient on the formula
+// charts. By default this is `target * displayScale` (130 % of target). When
+// no target has been set we fall back to the formula value so the chart
+// still renders something meaningful. (#10)
+function nutrientAxisMax(
+  n: { per100g: number; displayScale?: number },
+  formulaVal = 0,
+): number {
+  const target = n.per100g;
+  const displayScale =
+    typeof n.displayScale === "number" &&
+    Number.isFinite(n.displayScale) &&
+    n.displayScale > 0
+      ? n.displayScale
+      : DEFAULT_DISPLAY_SCALE;
+  if (target > 0) return target * displayScale;
+  return Math.max(formulaVal, MIN_DEVIATION_DENOM);
+}
 // Mass tolerance (g) below which the formula total is considered to match.
 const MASS_TOLERANCE_G = 0.05;
 // Composition match (%) below this raises a "match too low" warning.
@@ -712,9 +736,25 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   // ingredient, summing to the nutrient's absolute amount in this formula.
   // Each ingredient is shown in its assigned color so it stays consistent
   // across every chart on the page (#9, #10).
+  // Pivoted heatmap: one row per *tracked nutrient*, one stacked bar per
+  // ingredient. Each row is normalised by the same `target * displayScale`
+  // axis used for the radar charts so a full bar represents the chart-axis
+  // maximum (130 % of target by default). Absolute values are kept on
+  // `_abs:<id>` keys for the tooltip. (#7, #9, #10)
   const nutrientHeatmapData = trackedNutrients.map((n) => {
-    const row: Record<string, number | string> = { name: `${n.name} (${n.unit})` };
-    for (const c of contributions) row[c.ingredientId] = c.values[n.name] ?? 0;
+    const formulaVal = calc[n.name] ?? 0;
+    const axisMax = nutrientAxisMax(n, formulaVal);
+    const row: Record<string, number | string> = {
+      name: `${n.name} (${n.unit})`,
+      _unit: n.unit,
+      _axisMax: axisMax,
+      _target: n.per100g,
+    };
+    for (const c of contributions) {
+      const abs = c.values[n.name] ?? 0;
+      row[c.ingredientId] = abs / axisMax;
+      row[`_abs:${c.ingredientId}`] = abs;
+    }
     return row;
   });
   const ingredientIdsInUse = contributions.map((c) => c.ingredientId);
@@ -722,25 +762,28 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   const usedIngredients = ingredients.filter((i) => radarIngredientIds.has(i.id));
 
   // Radar data: one entry per tracked nutrient. Each axis is normalised
-  // against the larger of (target, formula) so the polygons land on the
-  // 0–1 scale and axes with very different units (kcal vs g) are visually
-  // comparable. Ingredient outlines share that same denominator and are
-  // clipped to the ring so they never shrink the target/formula shapes. (#10)
+  // against `target * displayScale` (default 1.3×target) so the maximum
+  // shown for a nutrient is fixed by the target — the polygons no longer
+  // shift around as ingredient masses change. Target/formula are per 100 g;
+  // ingredient outlines are shown at INGREDIENT_RADAR_MASS_G (50 g) for
+  // reference only and clipped to the ring. (#1, #2)
   const radarData = trackedNutrients.map((n) => {
     const target = n.per100g;
     const formulaVal = calc[n.name] ?? 0;
-    const denom = Math.max(target, formulaVal, MIN_DEVIATION_DENOM);
+    const axisMax = nutrientAxisMax(n, formulaVal);
     const row: RadarRow = {
       nutrient: n.name,
-      Target: target / denom,
-      Formula: formulaVal / denom,
+      Target: Math.min(1, target / axisMax),
+      Formula: Math.min(1, formulaVal / axisMax),
       // Carry the absolute values along so the tooltip can show real units.
       _target: target,
       _formula: formulaVal,
       _unit: n.unit,
     };
     for (const ing of usedIngredients) {
-      row[`ing:${ing.id}`] = Math.min(1, (ing.nutrition?.[n.name] ?? 0) / denom);
+      const per100g = ing.nutrition?.[n.name] ?? 0;
+      const at50g = per100g * (INGREDIENT_RADAR_MASS_G / 100);
+      row[`ing:${ing.id}`] = Math.min(1, at50g / axisMax);
     }
     return row;
   });
@@ -921,6 +964,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                 <IngredientRadar
                                   ingredient={ing}
                                   trackedNutrients={trackedNutrients}
+                                  formulaNutrition={calc}
                                   color={colorForIngredient(line.ingredientId)}
                                 />
                               </div>
@@ -1076,7 +1120,9 @@ export default function FormulaDetailClient({ id }: { id: string }) {
 
           {/* Per-nutrient stacked breakdown: each row is a tracked nutrient
               and each segment shows how much of it comes from each
-              ingredient, colored consistently with the radar charts. (#9) */}
+              ingredient, colored consistently with the radar charts. Each
+              row is scaled the same way the radar axes are — a full bar
+              represents the chart-axis maximum for that nutrient. (#7, #9) */}
           {nutrientHeatmapData.length > 0 && ingredientIdsInUse.length > 0 && (
             <Card className="print:hidden">
               <CardHeader>
@@ -1089,9 +1135,14 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                 >
                   <BarChart data={nutrientHeatmapData} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" tick={{ fontSize: 10 }} />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 10 }}
+                      domain={[0, 1]}
+                      tickFormatter={(v: number) => `${Math.round(v * 100)}%`}
+                    />
                     <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
-                    <Tooltip />
+                    <Tooltip content={<NutrientSourcesTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     {contributions.map((c) => (
                       <Bar
@@ -1148,10 +1199,11 @@ export default function FormulaDetailClient({ id }: { id: string }) {
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Nutrition Profile</CardTitle>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Each axis is one tracked nutrient, normalised to whichever is
-                  larger of target and formula so all axes are comparable.
-                  Ingredient outlines show their per-100&nbsp;g nutrient profile
-                  on the same scale. Hover for absolute values.
+                  Each axis is one tracked nutrient, scaled so the outer ring
+                  is the nutrient&apos;s configured target multiplier
+                  ({DEFAULT_DISPLAY_SCALE}× by default). Ingredient outlines
+                  are drawn at {INGREDIENT_RADAR_MASS_G}&nbsp;g for reference.
+                  Hover for absolute values.
                 </p>
               </CardHeader>
               <CardContent>
@@ -1174,6 +1226,10 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                         fill="none"
                         strokeWidth={1}
                         isAnimationActive={false}
+                        // Don't surface ingredient values on hover — the
+                        // formula and target are what matter here. (#3)
+                        activeDot={false}
+                        tooltipType="none"
                       />
                     ))}
                     <Radar
@@ -1184,6 +1240,8 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                       strokeDasharray="4 3"
                       fill="none"
                       isAnimationActive={false}
+                      // Legend should only list ingredients. (#4)
+                      legendType="none"
                     />
                     <Radar
                       name="Formula"
@@ -1192,6 +1250,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                       strokeWidth={2}
                       fill="none"
                       isAnimationActive={false}
+                      legendType="none"
                     />
                     <Tooltip content={<RadarValueTooltip rows={radarData} />} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -1885,33 +1944,36 @@ function ConstraintDialog({
 
 // ─── Small radar sparkline (#11) ───
 // A 32×32 px filled radar of an ingredient's nutrition profile, drawn in the
-// ingredient's assigned color. Each axis is a tracked nutrient and is
-// normalised by the single maximum value across this ingredient's tracked
-// nutrients so the polygon shape encodes "what's this ingredient rich in?"
-// within the displayed subset rather than absolute magnitudes (which differ
-// wildly by unit).
+// ingredient's assigned color. Uses the *same* per-axis scaling as the big
+// formula radar (each axis maxes out at `target * displayScale`) and renders
+// the ingredient at INGREDIENT_RADAR_MASS_G (50 g) so the small chart is
+// directly comparable to the corresponding outline in the big chart. The
+// hover tooltip still reports per-100 g values for parity with the rest of
+// the UI. (#5, #6)
 function IngredientRadar({
-  ingredient, trackedNutrients, color,
+  ingredient, trackedNutrients, formulaNutrition, color,
 }: {
   ingredient: { nutrition: Record<string, number> } | undefined;
-  trackedNutrients: { name: string }[];
+  trackedNutrients: { name: string; per100g: number; displayScale?: number; unit?: string }[];
+  formulaNutrition: Record<string, number>;
   color: string;
 }) {
   if (!ingredient || trackedNutrients.length < 3) return null;
-  const max = trackedNutrients.reduce(
-    (m, n) => Math.max(m, ingredient.nutrition?.[n.name] ?? 0),
-    0
-  );
-  if (max <= 0) return null;
-  const data = trackedNutrients.map((n) => ({
-    nutrient: n.name,
-    v: (ingredient.nutrition?.[n.name] ?? 0) / max,
-  }));
+  const data = trackedNutrients.map((n) => {
+    const per100g = ingredient.nutrition?.[n.name] ?? 0;
+    const at50g = per100g * (INGREDIENT_RADAR_MASS_G / 100);
+    const formulaVal = formulaNutrition[n.name] ?? 0;
+    const axisMax = nutrientAxisMax(n, formulaVal);
+    return {
+      nutrient: n.name,
+      v: Math.min(1, at50g / axisMax),
+    };
+  });
   return (
     <div
       className="w-8 h-8 shrink-0 print:hidden"
       title={`${trackedNutrients
-        .map((n) => `${n.name}: ${(ingredient.nutrition?.[n.name] ?? 0).toFixed(1)}`)
+        .map((n) => `${n.name}: ${(ingredient.nutrition?.[n.name] ?? 0).toFixed(1)}${n.unit ? " " + n.unit : ""}`)
         .join(", ")} (per 100 g)`}
     >
       <div className="w-full h-full pointer-events-none">
@@ -1971,6 +2033,54 @@ function RadarValueTooltip({
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── Tooltip for the per-nutrient stacked bar chart (#7) ───
+// Bars are normalised to "fraction of axis-max" so the tooltip needs to
+// show absolute values (in the nutrient's unit) for the segments.
+interface NutrientSourcesPayloadEntry {
+  name?: string;
+  dataKey?: string | number;
+  color?: string;
+  payload?: Record<string, string | number | undefined>;
+}
+function NutrientSourcesTooltip({
+  active, payload, label,
+}: {
+  active?: boolean;
+  payload?: NutrientSourcesPayloadEntry[];
+  label?: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0]?.payload ?? {};
+  const unit = (row._unit as string) ?? "";
+  const target = row._target as number | undefined;
+  return (
+    <div className="rounded-md border bg-white dark:bg-gray-900 px-3 py-2 text-xs shadow-md">
+      <div className="font-medium text-gray-700 dark:text-gray-200 pb-1">{label}</div>
+      {payload.map((entry) => {
+        const key = String(entry.dataKey ?? "");
+        const abs = (row[`_abs:${key}`] as number | undefined) ?? 0;
+        return (
+          <div key={key} className="grid grid-cols-[auto_1fr_auto] gap-x-2 tabular-nums items-center">
+            <span
+              className="w-2 h-2 rounded-sm shrink-0"
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="text-gray-700 dark:text-gray-200 truncate">{entry.name}</span>
+            <span className="text-right">{abs.toFixed(2)}&nbsp;{unit}</span>
+          </div>
+        );
+      })}
+      {target !== undefined && target > 0 && (
+        <div className="grid grid-cols-[auto_1fr_auto] gap-x-2 tabular-nums items-center pt-1 mt-1 border-t text-gray-500 dark:text-gray-400">
+          <span className="w-2 h-2 shrink-0" />
+          <span>Target</span>
+          <span className="text-right">{target.toFixed(2)}&nbsp;{unit}</span>
+        </div>
+      )}
     </div>
   );
 }
