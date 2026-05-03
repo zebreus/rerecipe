@@ -27,7 +27,7 @@ const STEPS = [
     icon: Leaf,
     title: "2. Build Your Ingredient Library",
     description:
-      "Add all candidate ingredients with their nutritional composition. Include density, category, and source information for traceability.",
+      "Add all candidate ingredients with their nutritional composition. Include category and source information for traceability.",
     tips: [
       "Use supplier data sheets for accurate composition",
       "Set confidence levels to track data quality",

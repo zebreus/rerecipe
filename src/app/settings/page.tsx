@@ -157,8 +157,7 @@ export default function SettingsPage() {
       lines.push(`## ${escapeMdInline(ing.name)}`);
       lines.push("");
       lines.push(`- **Category:** ${escapeMdInline(ing.category)}`);
-      lines.push(`- **Density:** ${ing.density_g_ml} g/mL`);
-      lines.push(`- **Cost per kg:** $${ing.costPerKg}`);
+      lines.push(`- **Cost per kg:** €${ing.costPerKg}`);
       lines.push(`- **Confidence:** ${(ing.confidence * 100).toFixed(0)}%`);
       if (ing.source) lines.push(`- **Source:** ${escapeMdInline(ing.source)}`);
       lines.push("");
@@ -220,7 +219,6 @@ export default function SettingsPage() {
             {(
               [
                 { key: "showCategoryColumn", label: "Category" },
-                { key: "showDensityColumn", label: "Density" },
                 { key: "showCostColumn", label: "Cost" },
               ] as const
             ).map(({ key, label }) => (

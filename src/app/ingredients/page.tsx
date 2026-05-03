@@ -29,10 +29,11 @@ import {
   nutritionColor,
 } from "@/lib/types";
 import { generateId } from "@/lib/utils";
-import { Plus, Pencil, Trash2, Search, Leaf, Zap, HelpCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Leaf, Zap, HelpCircle, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { NumberInput } from "@/components/ui/number-input";
 import {
   BarChart,
   Bar,
@@ -111,7 +112,6 @@ export default function IngredientsPage() {
       id: generateId(),
       name: "",
       category: "Other",
-      density_g_ml: 1.0,
       nutrition: emptyNutrition(trackedNames),
       source: "",
       confidence: 0.9,
@@ -253,9 +253,6 @@ export default function IngredientsPage() {
                         {settings.showCategoryColumn && (
                           <th className="pb-2 font-medium">Category</th>
                         )}
-                        {settings.showDensityColumn && (
-                          <th className="pb-2 font-medium">Density</th>
-                        )}
                         {settings.showCostColumn && (
                           <th className="pb-2 font-medium">Cost</th>
                         )}
@@ -284,12 +281,9 @@ export default function IngredientsPage() {
                               </Badge>
                             </td>
                           )}
-                          {settings.showDensityColumn && (
-                            <td className="py-2">{ing.density_g_ml} g/mL</td>
-                          )}
                           {settings.showCostColumn && (
                             <td className="py-2">
-                              {ing.costPerKg ? `$${ing.costPerKg.toFixed(2)}/kg` : "—"}
+                              {ing.costPerKg ? `€${ing.costPerKg.toFixed(2)}/kg` : "—"}
                             </td>
                           )}
                           {summaryNutrients.map((n) => (
@@ -351,14 +345,10 @@ export default function IngredientsPage() {
                     <span className="text-gray-500 dark:text-gray-400">Category:</span>{" "}
                     {selected.category}
                   </p>
-                  <p>
-                    <span className="text-gray-500 dark:text-gray-400">Density:</span>{" "}
-                    {selected.density_g_ml} g/mL
-                  </p>
                   {selected.costPerKg > 0 && (
                     <p>
                       <span className="text-gray-500 dark:text-gray-400">Cost:</span>{" "}
-                      ${selected.costPerKg.toFixed(2)}/kg
+                      €{selected.costPerKg.toFixed(2)}/kg
                     </p>
                   )}
                   <p className="flex items-center gap-1">
@@ -500,31 +490,15 @@ export default function IngredientsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Density (g/mL)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={editing.density_g_ml}
-                    onChange={(e) =>
-                      setEditing({
-                        ...editing,
-                        density_g_ml: Math.max(0.01, Number(e.target.value)),
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Cost per kg ($)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                  <Label>Cost per kg (€)</Label>
+                  <NumberInput
+                    step={0.01}
+                    min={0}
                     value={editing.costPerKg}
-                    onChange={(e) =>
+                    onCommit={(v) =>
                       setEditing({
                         ...editing,
-                        costPerKg: Number(e.target.value),
+                        costPerKg: Math.max(0, v),
                       })
                     }
                   />
@@ -534,16 +508,15 @@ export default function IngredientsPage() {
                     Confidence (0–1)
                     <ConfidenceHelpButton />
                   </Label>
-                  <Input
-                    type="number"
-                    step="0.05"
-                    min="0"
-                    max="1"
+                  <NumberInput
+                    step={0.01}
+                    min={0}
+                    max={1}
                     value={editing.confidence}
-                    onChange={(e) =>
+                    onCommit={(v) =>
                       setEditing({
                         ...editing,
-                        confidence: Number(e.target.value),
+                        confidence: Math.min(1, Math.max(0, v)),
                       })
                     }
                   />
@@ -554,36 +527,113 @@ export default function IngredientsPage() {
                 <p className="text-sm font-medium mb-2">
                   Nutrition (per 100&nbsp;g)
                 </p>
-                {trackedNutrients.length === 0 ? (
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
-                    No nutritional values are tracked. Add some on the Target page.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {trackedNutrients.map((n) => (
-                      <div key={n.name} className="space-y-1">
-                        <Label className="text-xs">
-                          {n.name} ({n.unit})
-                        </Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          value={editing.nutrition?.[n.name] ?? 0}
-                          onChange={(e) =>
-                            setEditing({
-                              ...editing,
-                              nutrition: {
-                                ...editing.nutrition,
-                                [n.name]: Math.max(0, Number(e.target.value)),
-                              },
-                            })
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {(() => {
+                  // Tracked nutrients (defined on the target) plus any extra
+                  // nutrients already on the ingredient that the target
+                  // doesn't track. The "Add extra" control below appends
+                  // new keys to `editing.nutrition`.
+                  const trackedNamesSet = new Set(trackedNames);
+                  const extraNames = Object.keys(editing.nutrition ?? {})
+                    .filter((n) => !trackedNamesSet.has(n))
+                    .sort();
+                  if (
+                    trackedNutrients.length === 0 &&
+                    extraNames.length === 0
+                  ) {
+                    return (
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                        No nutritional values are tracked. Add some on the
+                        Target page, or add a one-off entry below.
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-3">
+                      {trackedNutrients.length > 0 && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          {trackedNutrients.map((n) => (
+                            <div key={n.name} className="space-y-1">
+                              <Label className="text-xs">
+                                {n.name} ({n.unit})
+                              </Label>
+                              <NumberInput
+                                step={0.01}
+                                min={0}
+                                value={editing.nutrition?.[n.name] ?? 0}
+                                onCommit={(v) =>
+                                  setEditing({
+                                    ...editing,
+                                    nutrition: {
+                                      ...editing.nutrition,
+                                      [n.name]: Math.max(0, v),
+                                    },
+                                  })
+                                }
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {extraNames.length > 0 && (
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+                            Extra (not tracked by target)
+                          </p>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {extraNames.map((name) => (
+                              <div key={name} className="space-y-1">
+                                <Label className="text-xs flex items-center gap-1">
+                                  <span className="truncate" title={name}>
+                                    {name}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    aria-label={`Remove ${name}`}
+                                    title="Remove this nutrient"
+                                    className="text-gray-400 hover:text-red-500"
+                                    onClick={() => {
+                                      const next = { ...editing.nutrition };
+                                      delete next[name];
+                                      setEditing({ ...editing, nutrition: next });
+                                    }}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Label>
+                                <NumberInput
+                                  step={0.01}
+                                  min={0}
+                                  value={editing.nutrition?.[name] ?? 0}
+                                  onCommit={(v) =>
+                                    setEditing({
+                                      ...editing,
+                                      nutrition: {
+                                        ...editing.nutrition,
+                                        [name]: Math.max(0, v),
+                                      },
+                                    })
+                                  }
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <AddExtraNutrient
+                        existingNames={Object.keys(editing.nutrition ?? {})}
+                        onAdd={(name) =>
+                          setEditing({
+                            ...editing,
+                            nutrition: {
+                              ...editing.nutrition,
+                              [name]: 0,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="space-y-2">
@@ -686,7 +736,6 @@ export default function IngredientsPage() {
                         id: generateId(),
                         name: item.name,
                         category: item.category,
-                        density_g_ml: item.density_g_ml,
                         nutrition: presetNutrition(item),
                         source: "",
                         confidence: 0.9,
@@ -720,6 +769,52 @@ export default function IngredientsPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// Inline form for adding a one-off nutrient entry to an ingredient that
+// isn't tracked by the target. Lets the user keep extra values around for
+// future targets without polluting the target list.
+function AddExtraNutrient({
+  existingNames,
+  onAdd,
+}: {
+  existingNames: string[];
+  onAdd: (name: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const trimmed = name.trim();
+  const taken = existingNames.some(
+    (n) => n.toLowerCase() === trimmed.toLowerCase()
+  );
+  const canAdd = trimmed.length > 0 && !taken;
+  function commit() {
+    if (!canAdd) return;
+    onAdd(trimmed);
+    setName("");
+  }
+  return (
+    <div className="flex items-end gap-2 pt-2 border-t">
+      <div className="flex-1 space-y-1">
+        <Label className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          Add extra nutrient
+        </Label>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commit();
+            }
+          }}
+          placeholder="e.g. Iron, Vitamin C"
+        />
+      </div>
+      <Button variant="outline" size="sm" onClick={commit} disabled={!canAdd} aria-label="Add extra nutrient">
+        <Plus className="h-4 w-4" />
+      </Button>
     </div>
   );
 }

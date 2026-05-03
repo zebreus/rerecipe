@@ -106,7 +106,7 @@ export function createSeedData(): ProjectData {
   };
 
   data.ingredients = [
-    makeIngredient("ing-1", "Whole Milk", "Dairy", 1.03, {
+    makeIngredient("ing-1", "Whole Milk", "Dairy", {
       Energy: 61,
       Fat: 3.5,
       "Saturated Fat": 1.9,
@@ -116,7 +116,7 @@ export function createSeedData(): ProjectData {
       Fibre: 0,
       Salt: 0.1,
     }, 1.2),
-    makeIngredient("ing-2", "Short Grain Rice", "Grain", 0.85, {
+    makeIngredient("ing-2", "Short Grain Rice", "Grain", {
       Energy: 358,
       Fat: 0.6,
       "Saturated Fat": 0.2,
@@ -126,7 +126,7 @@ export function createSeedData(): ProjectData {
       Fibre: 1.4,
       Salt: 0,
     }, 2.5),
-    makeIngredient("ing-3", "Granulated Sugar", "Sugar & Sweetener", 1.55, {
+    makeIngredient("ing-3", "Granulated Sugar", "Sugar & Sweetener", {
       Energy: 387,
       Fat: 0,
       "Saturated Fat": 0,
@@ -136,7 +136,7 @@ export function createSeedData(): ProjectData {
       Fibre: 0,
       Salt: 0,
     }, 0.9),
-    makeIngredient("ing-4", "Heavy Cream", "Dairy", 0.99, {
+    makeIngredient("ing-4", "Heavy Cream", "Dairy", {
       Energy: 340,
       Fat: 36,
       "Saturated Fat": 23,
@@ -146,7 +146,7 @@ export function createSeedData(): ProjectData {
       Fibre: 0,
       Salt: 0.05,
     }, 6.5),
-    makeIngredient("ing-5", "Modified Starch", "Starch", 0.6, {
+    makeIngredient("ing-5", "Modified Starch", "Starch", {
       Energy: 354,
       Fat: 0,
       "Saturated Fat": 0,
@@ -156,7 +156,7 @@ export function createSeedData(): ProjectData {
       Fibre: 0,
       Salt: 0,
     }, 4.0),
-    makeIngredient("ing-6", "Carrageenan", "Hydrocolloid", 0.65, {
+    makeIngredient("ing-6", "Carrageenan", "Hydrocolloid", {
       Energy: 0,
       Fat: 0,
       "Saturated Fat": 0,
@@ -166,7 +166,7 @@ export function createSeedData(): ProjectData {
       Fibre: 85,
       Salt: 0,
     }, 35.0),
-    makeIngredient("ing-7", "Vanilla Extract", "Flavor", 0.88, {
+    makeIngredient("ing-7", "Vanilla Extract", "Flavor", {
       Energy: 288,
       Fat: 0.1,
       "Saturated Fat": 0,
@@ -176,7 +176,7 @@ export function createSeedData(): ProjectData {
       Fibre: 0,
       Salt: 0,
     }, 120.0),
-    makeIngredient("ing-8", "Salt", "Salt", 2.16, {
+    makeIngredient("ing-8", "Salt", "Salt", {
       Energy: 0,
       Fat: 0,
       "Saturated Fat": 0,
@@ -802,7 +802,6 @@ function makeIngredient(
   id: string,
   name: string,
   category: string,
-  density: number,
   nutrition: Ingredient["nutrition"],
   costPerKg: number = 0
 ): Ingredient {
@@ -810,7 +809,6 @@ function makeIngredient(
     id,
     name,
     category,
-    density_g_ml: density,
     nutrition,
     source: "",
     confidence: 0.9,

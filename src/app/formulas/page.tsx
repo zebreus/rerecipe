@@ -92,13 +92,16 @@ function FormulasListView() {
       const perUndefinedPct =
         withoutPct.length > 0 ? remainingPct / withoutPct.length : 0;
 
-      // Compute raw masses from percentages (no floor clamp).
+      // Compute raw masses from percentages (no floor clamp). When the target
+      // sets a percentage explicitly, the line is *locked* by default so the
+      // user's deliberate target value is preserved across slider edits and
+      // solver runs (#1).
       const rawLines = targetIngredients.map((ti) => {
         const pct = ti.targetPct ?? perUndefinedPct;
         return {
           ingredientId: ti.ingredientId,
           massG: (pct / 100) * targetMassG,
-          locked: false,
+          locked: ti.targetPct !== undefined,
         };
       });
 
