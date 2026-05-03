@@ -172,7 +172,10 @@ function snapToBudget(
   }
   if (unlockedIndices.length === 0) return snapped;
   const targetUnlocked = snapMass(unlockedBudgetG);
-  const diff = Math.round((targetUnlocked - unlockedTotal) / MASS_STEP_G); // integer steps
+  // Round toward the nearest integer step while preserving sign — Math.round
+  // alone would map -0.4 to 0 instead of -1 for small negative residuals.
+  const rawDiff = (targetUnlocked - unlockedTotal) / MASS_STEP_G;
+  const diff = rawDiff >= 0 ? Math.round(rawDiff) : -Math.round(-rawDiff);
   if (diff === 0) return snapped;
 
   if (diff > 0) {
@@ -191,9 +194,8 @@ function snapToBudget(
       k--
     ) {
       const idx = unlockedIndices[k];
-      const canRemove = Math.floor(
-        (snapped[idx].massG + MASS_STEP_G / 2) / MASS_STEP_G
-      );
+      // Number of complete MASS_STEP_G steps available in this line.
+      const canRemove = Math.floor(snapped[idx].massG / MASS_STEP_G);
       const toRemove = Math.min(remaining, canRemove);
       if (toRemove > 0) {
         snapped[idx] = {
