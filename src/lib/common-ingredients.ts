@@ -3,7 +3,6 @@ import type { Ingredient } from "./types";
 export interface CommonIngredient {
   name: string;
   category: string;
-  density_g_ml: number;
   // Per-100g nutritional values, keyed by name. Uses the same nutrient
   // names as the German Nährwertangaben defaults so they line up with the
   // target product's tracked nutrition.
@@ -15,7 +14,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Water",
     category: "Water",
-    density_g_ml: 1.0,
     nutrition: {
       Energy: 0,
       Fat: 0,
@@ -31,7 +29,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Flour (All-Purpose)",
     category: "Grain",
-    density_g_ml: 0.59,
     nutrition: {
       Energy: 364,
       Fat: 1.2,
@@ -47,7 +44,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Butter",
     category: "Fat & Oil",
-    density_g_ml: 0.91,
     nutrition: {
       Energy: 717,
       Fat: 81.1,
@@ -63,7 +59,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Eggs (Whole)",
     category: "Protein",
-    density_g_ml: 1.03,
     nutrition: {
       Energy: 143,
       Fat: 9.5,
@@ -79,7 +74,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Olive Oil",
     category: "Fat & Oil",
-    density_g_ml: 0.92,
     nutrition: {
       Energy: 884,
       Fat: 100,
@@ -95,7 +89,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Whole Milk",
     category: "Dairy",
-    density_g_ml: 1.03,
     nutrition: {
       Energy: 61,
       Fat: 3.3,
@@ -111,7 +104,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Granulated Sugar",
     category: "Sugar & Sweetener",
-    density_g_ml: 0.85,
     nutrition: {
       Energy: 387,
       Fat: 0,
@@ -127,7 +119,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Salt",
     category: "Salt",
-    density_g_ml: 1.2,
     nutrition: {
       Energy: 0,
       Fat: 0,
@@ -143,7 +134,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Cocoa Powder",
     category: "Flavor",
-    density_g_ml: 0.64,
     nutrition: {
       Energy: 228,
       Fat: 13.7,
@@ -159,7 +149,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Cream Cheese",
     category: "Dairy",
-    density_g_ml: 1.05,
     nutrition: {
       Energy: 342,
       Fat: 34.4,
@@ -175,7 +164,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Honey",
     category: "Sugar & Sweetener",
-    density_g_ml: 1.42,
     nutrition: {
       Energy: 304,
       Fat: 0,
@@ -191,7 +179,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Cornstarch",
     category: "Starch",
-    density_g_ml: 0.56,
     nutrition: {
       Energy: 381,
       Fat: 0.1,
@@ -207,7 +194,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Baking Powder",
     category: "Other",
-    density_g_ml: 0.9,
     nutrition: {
       Energy: 53,
       Fat: 0,
@@ -223,7 +209,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Garlic",
     category: "Flavor",
-    density_g_ml: 1.05,
     nutrition: {
       Energy: 149,
       Fat: 0.5,
@@ -239,7 +224,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
   {
     name: "Onion",
     category: "Flavor",
-    density_g_ml: 0.96,
     nutrition: {
       Energy: 40,
       Fat: 0.1,
@@ -258,7 +242,6 @@ export const COMMON_INGREDIENTS: CommonIngredient[] = [
 export function isUnmodifiedCommonIngredient(ing: {
   name: string;
   category: string;
-  density_g_ml: number;
   nutrition: Record<string, number>;
   costPerKg: number;
 }): boolean {
@@ -267,7 +250,6 @@ export function isUnmodifiedCommonIngredient(ing: {
   );
   if (!match) return false;
   if (match.category !== ing.category) return false;
-  if (match.density_g_ml !== ing.density_g_ml) return false;
   if (match.costPerKg !== ing.costPerKg) return false;
   const matchKeys = Object.keys(match.nutrition);
   // Only compare the preset's own keys. Extra keys on the ingredient are

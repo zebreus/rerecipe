@@ -37,6 +37,8 @@ import {
 } from "recharts";
 import { Save, Plus, X, ArrowUp, ArrowDown, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import Link from "next/link";
+import { NumberInput } from "@/components/ui/number-input";
 
 export default function TargetPage() {
   const { data, updateTarget } = useStore();
@@ -212,14 +214,16 @@ export default function TargetPage() {
       !target.targetIngredients.some((ti) => ti.ingredientId === ing.id)
   );
 
-  // Total of set target percentages
-  const totalTargetPct = target.targetIngredients.reduce(
-    (sum, ti) => sum + (ti.targetPct ?? 0),
-    0
-  );
-  const hasPctValues = target.targetIngredients.some(
-    (ti) => ti.targetPct !== undefined
-  );
+  // Compute a feasibility check for the target percentages. Targets do *not*
+  // need to sum to 100% — most of the time the user only knows percentages
+  // for a few ingredients. We flag the case where it is *impossible* to
+  // satisfy the known percentages while honouring the ingredient label
+  // order (each entry has ≤ the previous entry's mass percentage).
+  //
+  // Example: with two ingredients where the first is locked to 10%, the
+  // second is bounded above by 10% — so the maximum total is 20% and the
+  // formula can never reach 100% no matter what the second ingredient does.
+  const feasibility = computeFeasibility(target.targetIngredients);
 
   return (
     <div className="space-y-6">
@@ -246,38 +250,46 @@ export default function TargetPage() {
             <CardContent className="pt-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Product Name</Label>
+                  <Label htmlFor="target-name">Product Name</Label>
                   <Input
+                    id="target-name"
                     value={target.name}
                     onChange={(e) => updateField("name", e.target.value)}
                     placeholder="e.g. Müller Rice – Original"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        document
+                          .getElementById("target-mass-g")
+                          ?.focus();
+                      }
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Target Mass (g)</Label>
-                  <Input
-                    type="number"
-                    min="0"
+                  <Label htmlFor="target-mass-g">Target Mass (g)</Label>
+                  <NumberInput
+                    id="target-mass-g"
                     value={target.targetMassG}
-                    onChange={(e) =>
-                      updateField(
-                        "targetMassG",
-                        Math.max(0, Number(e.target.value))
-                      )
+                    min={0}
+                    onCommit={(v) =>
+                      updateField("targetMassG", Math.max(0, v))
                     }
+                    onEnter={() => {
+                      document
+                        .getElementById("target-volume-ml")
+                        ?.focus();
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Target Volume (mL)</Label>
-                  <Input
-                    type="number"
-                    min="0"
+                  <Label htmlFor="target-volume-ml">Target Volume (mL)</Label>
+                  <NumberInput
+                    id="target-volume-ml"
                     value={target.targetVolumeMl}
-                    onChange={(e) =>
-                      updateField(
-                        "targetVolumeMl",
-                        Math.max(0, Number(e.target.value))
-                      )
+                    min={0}
+                    onCommit={(v) =>
+                      updateField("targetVolumeMl", Math.max(0, v))
                     }
                   />
                 </div>
@@ -324,36 +336,26 @@ export default function TargetPage() {
                     <Label className="flex-1 text-xs truncate" title={n.name}>
                       {n.name}
                     </Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
+                    <NumberInput
+                      step={0.1}
+                      min={0}
                       className="w-24"
                       value={n.per100g}
-                      onChange={(e) =>
-                        updateNutritionValue(
-                          n.name,
-                          Math.max(0, Number(e.target.value))
-                        )
+                      onCommit={(v) =>
+                        updateNutritionValue(n.name, Math.max(0, v))
                       }
                     />
                     <span className="text-xs text-gray-400 dark:text-gray-500 w-8">
                       {n.unit}
                     </span>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0.1"
+                    <NumberInput
+                      step={0.1}
+                      min={0.1}
                       className="w-16"
                       title={`Chart axis maximum = target × this scale (default ${DEFAULT_DISPLAY_SCALE.toFixed(1)})`}
-                      aria-label={`${n.name} display scale`}
+                      ariaLabel={`${n.name} display scale`}
                       value={n.displayScale ?? DEFAULT_DISPLAY_SCALE}
-                      onChange={(e) =>
-                        updateNutritionDisplayScale(
-                          n.name,
-                          Number(e.target.value)
-                        )
-                      }
+                      onCommit={(v) => updateNutritionDisplayScale(n.name, v)}
                     />
                     <span className="text-xs text-gray-400 dark:text-gray-500 w-8">
                       ×
@@ -476,13 +478,14 @@ export default function TargetPage() {
                 expected composition.
               </p>
 
-              {/* Warning: percentages don&apos;t sum to 100 */}
-              {hasPctValues && Math.abs(totalTargetPct - 100) > 1 && (
+              {/* Warning: target percentages can't add up to 100% no matter
+                  what the unspecified ingredients are set to (e.g. a fixed
+                  percentage on an early ingredient caps the maximum mass of
+                  every later ingredient via the label-order constraint). */}
+              {!feasibility.feasible && (
                 <div className="flex items-center gap-2 rounded-md px-3 py-2 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                  <span>
-                    Target percentages sum to {totalTargetPct.toFixed(1)}% (expected ~100%).
-                  </span>
+                  <span>{feasibility.message}</span>
                 </div>
               )}
 
@@ -521,18 +524,17 @@ export default function TargetPage() {
                             </td>
                             <td className="py-2">
                               <div className="flex items-center gap-1">
-                                <Input
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  max="100"
+                                <NumberInput
+                                  step={0.1}
+                                  min={0}
+                                  max={100}
                                   className="h-7 w-24 text-xs"
                                   placeholder="—"
-                                  value={ti.targetPct ?? ""}
-                                  onChange={(e) =>
+                                  value={ti.targetPct ?? 0}
+                                  onCommit={(v) =>
                                     updateTargetIngredientPct(
                                       ti.ingredientId,
-                                      e.target.value
+                                      String(v)
                                     )
                                   }
                                 />
@@ -586,21 +588,6 @@ export default function TargetPage() {
                         );
                       })}
                     </tbody>
-                    {hasPctValues && (
-                      <tfoot>
-                        <tr className="border-t">
-                          <td></td>
-                          <td className="py-2 text-xs text-gray-500 dark:text-gray-400">
-                            Total
-                          </td>
-                          <td className="py-2 text-xs font-medium tabular-nums">
-                            {totalTargetPct.toFixed(1)}%
-                          </td>
-                          <td></td>
-                          <td></td>
-                        </tr>
-                      </tfoot>
-                    )}
                   </table>
                 </div>
               )}
@@ -642,9 +629,9 @@ export default function TargetPage() {
               {data.ingredients.length === 0 && (
                 <p className="text-xs text-gray-400 dark:text-gray-500">
                   No ingredients in library yet.{" "}
-                  <a href="/ingredients" className="underline">
+                  <Link href="/ingredients" className="underline">
                     Add ingredients
-                  </a>{" "}
+                  </Link>{" "}
                   first.
                 </p>
               )}
@@ -719,4 +706,74 @@ export default function TargetPage() {
       </Tabs>
     </div>
   );
+}
+
+// Decide whether the configured target percentages can possibly be satisfied.
+// Targets are listed in label order — each entry's mass must be ≤ the
+// previous entry's mass. Combined with the constraint that mass percentages
+// total 100%, fixed `targetPct` values can make the system infeasible:
+//
+//   * A fixed percentage on an early entry caps every later entry's max
+//     percentage to that value, so the maximum total is bounded above.
+//   * A fixed percentage that is larger than a previous fixed percentage
+//     contradicts the descending-order requirement.
+//
+// Returns `feasible: true` when at least one assignment of the unspecified
+// percentages can sum to 100%, `false` (with a human-readable `message`)
+// otherwise.
+export function computeFeasibility(
+  targetIngredients: TargetIngredient[]
+): { feasible: true } | { feasible: false; message: string } {
+  if (targetIngredients.length === 0) return { feasible: true };
+
+  // Direct order violations: a fixed pct that exceeds an earlier fixed pct.
+  let prevFixed = Infinity;
+  for (const ti of targetIngredients) {
+    if (ti.targetPct !== undefined) {
+      if (ti.targetPct > prevFixed + 1e-6) {
+        return {
+          feasible: false,
+          message:
+            "A target percentage is larger than an earlier ingredient's percentage. Ingredients are listed in descending mass order, so each entry must have ≤ the previous entry's percentage.",
+        };
+      }
+      prevFixed = ti.targetPct;
+    }
+  }
+
+  // Maximum reachable total: each entry can be at most min(remaining cap,
+  // previous entry's value). Walk the list, allocating the maximum allowed
+  // to each unspecified entry; if the running total can't reach 100%,
+  // it's infeasible.
+  let runningTotal = 0;
+  let prevMaxPct = 100;
+  let usedFixed = 0;
+  for (const ti of targetIngredients) {
+    if (ti.targetPct !== undefined) {
+      runningTotal += ti.targetPct;
+      usedFixed += ti.targetPct;
+      prevMaxPct = ti.targetPct;
+    } else {
+      // Best-case: fill this entry up to prevMaxPct.
+      const fill = Math.max(0, prevMaxPct);
+      runningTotal += fill;
+      prevMaxPct = fill;
+    }
+  }
+
+  if (usedFixed > 100 + 1e-6) {
+    return {
+      feasible: false,
+      message: `Fixed target percentages already total ${usedFixed.toFixed(1)}%, which is more than 100%.`,
+    };
+  }
+
+  if (runningTotal < 100 - 1e-6) {
+    return {
+      feasible: false,
+      message: `These target percentages can never sum to 100%. Even at the maximum allowed by the ingredient order, the total can only reach ${runningTotal.toFixed(1)}%.`,
+    };
+  }
+
+  return { feasible: true };
 }

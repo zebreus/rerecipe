@@ -93,6 +93,12 @@ const MIN_DEVIATION_DENOM = 1e-3;
 // out the formula/target shapes. (#10)
 const INGREDIENT_RADAR_MASS_G = 50;
 
+// Minimum drawn fraction (0..1) for any value on the radar charts. Without
+// this floor, a nutrient that's at zero collapses to a single point and
+// disappears into the noise. Floors at 5 % of the axis scale per #5 of the
+// page feedback.
+const RADAR_MIN_FRACTION = 0.05;
+
 // Axis maximum (in absolute units) for a tracked nutrient on the formula
 // charts. By default this is `target * displayScale` (130 % of target). When
 // no target has been set we fall back to the formula value so the chart
@@ -133,6 +139,38 @@ function snapMass(g: number): number {
 
 function snapMassDown(g: number): number {
   return Math.floor((g + REDISTRIBUTION_EPS) / MASS_STEP_G) * MASS_STEP_G;
+}
+
+// After running the solver, snap each unlocked line to the MASS_STEP_G grid
+// and (when a budget is supplied) make the unlocked total exactly equal that
+// budget by absorbing the rounding residual into the last unlocked line.
+// This stops the total mass from drifting fractions of a gram each time the
+// solver is re-run (#7).
+function snapToBudget(
+  lines: FormulaLine[],
+  unlockedBudgetG: number | null
+): FormulaLine[] {
+  const snapped = lines.map((l) =>
+    l.locked ? l : { ...l, massG: Math.max(0, snapMass(l.massG)) }
+  );
+  if (unlockedBudgetG === null) return snapped;
+  const unlockedIndices: number[] = [];
+  let unlockedTotal = 0;
+  for (let i = 0; i < snapped.length; i++) {
+    if (!snapped[i].locked) {
+      unlockedIndices.push(i);
+      unlockedTotal += snapped[i].massG;
+    }
+  }
+  if (unlockedIndices.length === 0) return snapped;
+  const targetUnlocked = snapMass(unlockedBudgetG);
+  const diff = targetUnlocked - unlockedTotal;
+  if (Math.abs(diff) < MASS_STEP_G / 2) return snapped;
+  // Apply the residual to the last unlocked line, clamping at zero.
+  const last = unlockedIndices[unlockedIndices.length - 1];
+  const adjusted = snapMass(Math.max(0, snapped[last].massG + diff));
+  snapped[last] = { ...snapped[last], massG: adjusted };
+  return snapped;
 }
 
 // ─── Issue / warning types for the unified Issues card ───
@@ -767,14 +805,18 @@ export default function FormulaDetailClient({ id }: { id: string }) {
   // shift around as ingredient masses change. Target/formula are per 100 g;
   // ingredient outlines are shown at INGREDIENT_RADAR_MASS_G (50 g) for
   // reference only and clipped to the ring. (#1, #2)
+  //
+  // Each drawn value is also floored at RADAR_MIN_FRACTION of the axis
+  // scale so a nutrient that is exactly zero still shows a visible bump
+  // instead of collapsing to a single point at the centre. (#5)
   const radarData = trackedNutrients.map((n) => {
     const target = n.per100g;
     const formulaVal = calc[n.name] ?? 0;
     const axisMax = nutrientAxisMax(n, formulaVal);
     const row: RadarRow = {
       nutrient: n.name,
-      Target: Math.min(1, target / axisMax),
-      Formula: Math.min(1, formulaVal / axisMax),
+      Target: Math.max(RADAR_MIN_FRACTION, Math.min(1, target / axisMax)),
+      Formula: Math.max(RADAR_MIN_FRACTION, Math.min(1, formulaVal / axisMax)),
       // Carry the absolute values along so the tooltip can show real units.
       _target: target,
       _formula: formulaVal,
@@ -783,7 +825,10 @@ export default function FormulaDetailClient({ id }: { id: string }) {
     for (const ing of usedIngredients) {
       const per100g = ing.nutrition?.[n.name] ?? 0;
       const at50g = per100g * (INGREDIENT_RADAR_MASS_G / 100);
-      row[`ing:${ing.id}`] = Math.min(1, at50g / axisMax);
+      row[`ing:${ing.id}`] = Math.max(
+        RADAR_MIN_FRACTION,
+        Math.min(1, at50g / axisMax)
+      );
     }
     return row;
   });
@@ -812,10 +857,23 @@ export default function FormulaDetailClient({ id }: { id: string }) {
       {
         restarts: solverSettings.restarts,
         orderingWeight: solverSettings.orderingWeight,
+        strictOrdering: solverSettings.strictOrdering,
+        exploration: solverSettings.exploration,
         honorTotalMass: solverHonorTotal,
       }
     );
-    update({ ingredientLines: optimized });
+    // Snap to MASS_STEP_G precision and force the unlocked total to match
+    // exactly when the solver was constrained to a total mass — otherwise
+    // running the solver many times accumulates a fraction-of-a-gram drift
+    // (#7). The last unlocked line absorbs the residual.
+    const lockedSum = local.ingredientLines
+      .filter((l) => l.locked)
+      .reduce((s, l) => s + l.massG, 0);
+    const snapped = snapToBudget(
+      optimized,
+      solverHonorTotal ? Math.max(0, solverTargetMassG - lockedSum) : null
+    );
+    update({ ingredientLines: snapped });
   }
 
   function setSolverSetting<K extends keyof SolverSettings>(k: K, v: SolverSettings[K]) {
@@ -916,7 +974,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                       <tr className="border-b text-left text-gray-500 dark:text-gray-400">
                         <th className="pb-2 font-medium">Ingredient</th>
                         <th className="pb-2 font-medium">Mass (g)</th>
-                        {showCostColumn && <th className="pb-2 font-medium w-24">Cost ($)</th>}
+                        {showCostColumn && <th className="pb-2 font-medium w-24">Cost (€)</th>}
                         <th className="pb-2 font-medium w-16 print:hidden">Lock</th>
                         <th className="pb-2 font-medium w-16 print:hidden">Order</th>
                         <th className="pb-2 font-medium w-12 print:hidden"></th>
@@ -977,7 +1035,9 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                   step={MASS_STEP_G}
                                   value={[sliderValue]}
                                   onValueChange={([val]) => setLineMass(idx, val)}
-                                  className="w-24 shrink-0 print:hidden"
+                                  // Doubled from w-24 so the slider is easier
+                                  // to nudge precisely on small screens. (#9)
+                                  className="w-48 shrink-0 print:hidden"
                                   disabled={sliderDisabled}
                                   thumbAriaLabel={`${ing?.name ?? "ingredient"} mass in grams`}
                                 />
@@ -1005,7 +1065,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                             </td>
                             {showCostColumn && (
                               <td className="py-2 text-right text-gray-700 dark:text-gray-300 tabular-nums">
-                                ${lineCost.toFixed(2)}
+                                €{lineCost.toFixed(2)}
                               </td>
                             )}
                             <td className="py-2 print:hidden">
@@ -1101,7 +1161,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                         </td>
                         {showCostColumn && (
                           <td className="py-2 text-right font-medium text-gray-900 dark:text-gray-100 tabular-nums">
-                            ${local.ingredientLines.reduce((sum, l) => {
+                            €{local.ingredientLines.reduce((sum, l) => {
                               const ing = ingredients.find((i) => i.id === l.ingredientId);
                               return sum + (ing ? (l.massG * ing.costPerKg) / 1000 : 0);
                             }, 0).toFixed(2)}
@@ -1235,7 +1295,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                     <Radar
                       name="Target"
                       dataKey="Target"
-                      stroke="#6b7280"
+                      stroke="#ffffff"
                       strokeWidth={2}
                       strokeDasharray="4 3"
                       fill="none"
@@ -1246,7 +1306,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                     <Radar
                       name="Formula"
                       dataKey="Formula"
-                      stroke="#6b7280"
+                      stroke="#ffffff"
                       strokeWidth={2}
                       fill="none"
                       isAnimationActive={false}
@@ -1648,16 +1708,25 @@ function IssuesCard({
     ? { bg: "bg-orange-50 dark:bg-orange-900/30", text: "text-orange-700 dark:text-orange-300", border: "border-orange-200 dark:border-orange-800" }
     : { bg: "bg-green-50 dark:bg-green-900/20", text: "text-green-700 dark:text-green-300", border: "border-green-200 dark:border-green-800" };
 
-  // Grow the reserved space with the visible issue count, but cap it at
-  // eight lines and collapse the overflow behind a toggle so the card does
-  // not keep stretching the page. (#3, #7, #12)
+  // The reserved space tracks the *high water mark* of how many issue lines
+  // the panel has had since this card was first mounted (capped at the
+  // collapse threshold). That makes the panel feel stable while the user is
+  // dragging sliders: it grows when new issues appear, but never shrinks
+  // back when issues are fixed — so unrelated content below doesn't keep
+  // jumping around. (#10)
   const ISSUES_BEFORE_COLLAPSE = 8;
   const reservedIssueCount = Math.min(
     Math.max(visibleIssues.length, 1),
     ISSUES_BEFORE_COLLAPSE
   );
+  const [stableIssueCount, setStableIssueCount] = useState(reservedIssueCount);
+  // React-recommended "adjust state during render" pattern for derived
+  // values: cheaper than running a useEffect and avoids an extra paint.
+  if (reservedIssueCount > stableIssueCount) {
+    setStableIssueCount(reservedIssueCount);
+  }
   // Header takes ~2.25rem; each issue line ~1.4rem; plus a little padding.
-  const minHeightRem = 2.5 + reservedIssueCount * 1.4;
+  const minHeightRem = 2.5 + stableIssueCount * 1.4;
 
   const [expanded, setExpanded] = useState(false);
   const overflow = visibleIssues.length > ISSUES_BEFORE_COLLAPSE;
@@ -1813,7 +1882,8 @@ function SolverButtonGroup({
                   ? <li>No tracked nutrients (configure on Target page)</li>
                   : trackedNutrientNames.map((n) => <li key={n}>{n}</li>)}
                 {massConstraintLabel && <li>{massConstraintLabel}</li>}
-                {settings.orderingWeight > 0 && <li>Ingredient masses descending in line order</li>}
+                {settings.strictOrdering && <li>Ingredient masses strictly descending in line order</li>}
+                {!settings.strictOrdering && settings.orderingWeight > 0 && <li>Ingredient masses descending in line order (preference)</li>}
                 <li>Per-ingredient min/max ranges and locks</li>
               </ul>
             </div>
@@ -1829,10 +1899,23 @@ function SolverButtonGroup({
             </div>
             <div className="space-y-2">
               <Label className="text-xs">
+                Search creativity: {((settings.exploration ?? 0.5) * 100).toFixed(0)}%
+              </Label>
+              <Slider
+                min={0} max={1} step={0.05}
+                value={[settings.exploration ?? 0.5]}
+                onValueChange={([v]) => setSetting("exploration", Math.round(v * 20) / 20)}
+              />
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                0% keeps random restarts close to the current masses; 100% spreads them across the full feasible range so the solver can escape local maxima. Increase this when you suspect the solver is getting stuck.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">
                 Ordering preference weight: {settings.orderingWeight.toFixed(2)}
               </Label>
               <Slider
-                min={0} max={5} step={0.1}
+                min={0} max={20} step={0.1}
                 value={[settings.orderingWeight]}
                 onValueChange={([v]) => setSetting("orderingWeight", Math.round(v * 100) / 100)}
               />
@@ -1840,6 +1923,20 @@ function SolverButtonGroup({
                 0 = ignore line order; higher values strongly prefer solutions where each line is heavier than the line below it.
               </p>
             </div>
+            <label className="flex items-start gap-2 text-xs">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={settings.strictOrdering ?? false}
+                onChange={(e) => setSetting("strictOrdering", e.target.checked)}
+              />
+              <span>
+                Strictly enforce ingredient order
+                <span className="block text-[11px] text-gray-500 dark:text-gray-400">
+                  Hard constraint: each unlocked line is forced to weigh at least as much as the next line, instead of only being preferred to.
+                </span>
+              </span>
+            </label>
             {/* Two flags governing how the solver treats total mass. (#6)
                 Flag B is only meaningful when the formula has its total mass
                 locked — otherwise we hide it. */}
@@ -1966,12 +2063,14 @@ function IngredientRadar({
     const axisMax = nutrientAxisMax(n, formulaVal);
     return {
       nutrient: n.name,
-      v: Math.min(1, at50g / axisMax),
+      v: Math.max(RADAR_MIN_FRACTION, Math.min(1, at50g / axisMax)),
     };
   });
   return (
     <div
-      className="w-8 h-8 shrink-0 print:hidden"
+      // 50 % bigger than the previous w-8/h-8 so per-line nutrition shapes
+      // are easier to read at a glance. (#6)
+      className="w-12 h-12 shrink-0 print:hidden"
       title={`${trackedNutrients
         .map((n) => `${n.name}: ${(ingredient.nutrition?.[n.name] ?? 0).toFixed(1)}${n.unit ? " " + n.unit : ""}`)
         .join(", ")} (per 100 g)`}

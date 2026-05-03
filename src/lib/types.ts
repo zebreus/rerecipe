@@ -153,10 +153,10 @@ export interface Ingredient {
   id: string;
   name: string;
   category: string;
-  density_g_ml: number;
   // Nutritional values per 100 g of the ingredient, keyed by the
-  // nutritional value name. Only entries whose name is also tracked by the
-  // target are considered/shown elsewhere in the app.
+  // nutritional value name. Entries whose name is *not* tracked by the
+  // target are still kept (so they stay editable on the ingredient page),
+  // but only tracked entries are used for formula calculations.
   nutrition: Record<string, number>;
   source: string;
   confidence: number; // 0–1
@@ -185,6 +185,13 @@ export interface SolverSettings {
   // Soft penalty weight for keeping ingredient masses in descending order
   // matching the ingredient-line order on the formula. 0 = ignore order.
   orderingWeight: number;
+  // Hard ordering: when true the solver constrains adjacent unlocked masses
+  // so each line is strictly ≥ the line below it (within a small slack).
+  strictOrdering?: boolean;
+  // Search "creativity": 0 = restarts seeded near the current point, 1 =
+  // restarts uniformly distributed across the full feasible range. Higher
+  // values escape local maxima at the cost of speed.
+  exploration?: number;
   // Flag A — when true the solver constrains the unlocked sum to the target
   // mass. When the formula's total mass is locked and `ignoreLockedTotalMass`
   // is false, the locked total takes precedence and this flag has no effect.
@@ -197,7 +204,9 @@ export interface SolverSettings {
 
 export const DEFAULT_SOLVER_SETTINGS: SolverSettings = {
   restarts: 8,
-  orderingWeight: 0.5,
+  orderingWeight: 2,
+  strictOrdering: false,
+  exploration: 0.5,
   honorTotalMass: true,
   ignoreLockedTotalMass: false,
 };
@@ -394,13 +403,11 @@ export interface Note {
 }
 
 export interface ProjectSettings {
-  showDensityColumn: boolean;
   showCostColumn: boolean;
   showCategoryColumn: boolean;
 }
 
 export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
-  showDensityColumn: false,
   showCostColumn: false,
   showCategoryColumn: false,
 };

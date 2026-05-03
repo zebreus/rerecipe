@@ -282,7 +282,11 @@ export function checkIngredientOrderCompliance(
     return { status: "ok", issues: [] };
   }
 
-  const PCT_WARN_DIFF = 5; // percentage-point deviation threshold
+  // Any deviation that the formula's mass% rounds away from the target's
+  // configured percentage is surfaced as an issue. The user explicitly
+  // asked for this — if the target sets e.g. 65 % they expect the formula
+  // to also be at 65 %, not "close enough". (#2 of page feedback)
+  const PCT_WARN_DIFF = 0.05; // percentage points
 
   const totalG = lines.reduce((s, l) => s + l.massG, 0);
   const ingById = new Map<string, Ingredient>(ingredients.map((i) => [i.id, i]));
@@ -372,6 +376,8 @@ export function checkIngredientOrderCompliance(
 export interface SolverConfig {
   restarts?: number;        // independent restarts (default 8)
   orderingWeight?: number;  // soft penalty weight for line-order preference
+  strictOrdering?: boolean; // hard ordering: each unlocked line must be ≥ next
+  exploration?: number;     // 0..1; how widely random restarts are spread
   honorTotalMass?: boolean; // when false the unlocked sum is unconstrained
 }
 
@@ -384,6 +390,11 @@ export function runFormulaOptimizer(
 ): FormulaLine[] {
   const restarts = Math.max(1, config.restarts ?? 8);
   const orderingWeight = Math.max(0, config.orderingWeight ?? 0);
+  const strictOrdering = config.strictOrdering === true;
+  const exploration = Math.min(
+    1,
+    Math.max(0, config.exploration ?? 0.5)
+  );
   const honorTotalMass = config.honorTotalMass !== false;
 
   const locked = lines.filter((l) => l.locked);
@@ -475,9 +486,30 @@ export function runFormulaOptimizer(
 
   // Helper: clip to [minP, maxP] then renormalise to sum 1 (when honouring
   // total mass). Best-effort: we run a few rebalance passes since clipping
-  // can violate the simplex constraint.
+  // can violate the simplex constraint. When `strictOrdering` is on we
+  // additionally enforce p[j] >= p[j+1] by walking the array twice (once
+  // forward to push down later entries, once backward to push up earlier
+  // entries) before the rebalance pass.
+  function enforceMonotone(v: number[]): number[] {
+    if (!strictOrdering) return v;
+    const out = v.slice();
+    // Forward: each entry can be at most the previous entry.
+    for (let j = 1; j < J; j++) {
+      if (out[j] > out[j - 1]) out[j] = out[j - 1];
+    }
+    // Backward: ensure earlier entries respect later minimums.
+    for (let j = J - 2; j >= 0; j--) {
+      if (out[j] < out[j + 1]) out[j] = out[j + 1];
+    }
+    // Re-clip to box bounds (monotone fix may push us out).
+    for (let j = 0; j < J; j++) {
+      out[j] = Math.max(minP[j], Math.min(maxP[j], out[j]));
+    }
+    return out;
+  }
   function clipAndNormalise(v: number[]): number[] {
     let out = v.map((x, j) => Math.max(minP[j], Math.min(maxP[j], x)));
+    out = enforceMonotone(out);
     if (!honorTotalMass) return out.map((x) => Math.max(0, x));
     for (let pass = 0; pass < 20; pass++) {
       const sum = out.reduce((s, x) => s + x, 0);
@@ -492,6 +524,7 @@ export function runFormulaOptimizer(
       out = out.map((x, j) =>
         Math.max(minP[j], Math.min(maxP[j], x + (delta * slack[j]) / totalSlack))
       );
+      out = enforceMonotone(out);
     }
     return out;
   }
@@ -568,6 +601,10 @@ export function runFormulaOptimizer(
   // restart still explores a meaningfully wider neighbourhood.
   const UNBOUNDED_RESTART_MIN_SPAN_BUDGET_UNITS = 1;
   const UNBOUNDED_RESTART_INITIAL_FRACTION_MULTIPLIER = 2;
+  // `exploration` ∈ [0,1] controls how widely each restart can deviate from
+  // the current point: at 0 every restart sits next to `initial[j]`, at 1
+  // restarts cover the full feasible interval. Higher values trade speed
+  // for the chance to escape local maxima (#3).
   for (let r = 1; r < restarts; r++) {
     const seed = unlocked.map((_, j) => {
       const lo = minP[j];
@@ -581,7 +618,15 @@ export function runFormulaOptimizer(
               UNBOUNDED_RESTART_MIN_SPAN_BUDGET_UNITS
             )
       );
-      return lo + Math.random() * (hi - lo);
+      // Wide sample (full interval) blended with a Gaussian-ish jitter
+      // around the current value, weighted by `exploration`.
+      const wide = lo + Math.random() * (hi - lo);
+      const span = Math.max(0, hi - lo);
+      const jitterMagnitude = (1 - exploration) * span * 0.05;
+      const local =
+        initial[j] +
+        (Math.random() - 0.5) * 2 * jitterMagnitude;
+      return Math.max(lo, Math.min(hi, exploration * wide + (1 - exploration) * local));
     });
     const candidate = runOnce(seed);
     if (candidate.loss < best.loss) best = candidate;
