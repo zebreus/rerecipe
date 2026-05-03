@@ -509,7 +509,7 @@ export default function IngredientsPage() {
                     <ConfidenceHelpButton />
                   </Label>
                   <NumberInput
-                    step={0.05}
+                    step={0.01}
                     min={0}
                     max={1}
                     value={editing.confidence}
@@ -557,7 +557,7 @@ export default function IngredientsPage() {
                                 {n.name} ({n.unit})
                               </Label>
                               <NumberInput
-                                step={0.1}
+                                step={0.01}
                                 min={0}
                                 value={editing.nutrition?.[n.name] ?? 0}
                                 onCommit={(v) =>
@@ -601,7 +601,7 @@ export default function IngredientsPage() {
                                   </button>
                                 </Label>
                                 <NumberInput
-                                  step={0.1}
+                                  step={0.01}
                                   min={0}
                                   value={editing.nutrition?.[name] ?? 0}
                                   onCommit={(v) =>

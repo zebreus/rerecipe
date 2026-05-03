@@ -337,7 +337,7 @@ export default function TargetPage() {
                       {n.name}
                     </Label>
                     <NumberInput
-                      step={0.1}
+                      step={0.01}
                       min={0}
                       className="w-24"
                       value={n.per100g}
@@ -349,7 +349,7 @@ export default function TargetPage() {
                       {n.unit}
                     </span>
                     <NumberInput
-                      step={0.1}
+                      step={0.01}
                       min={0.1}
                       className="w-16"
                       title={`Chart axis maximum = target × this scale (default ${DEFAULT_DISPLAY_SCALE.toFixed(1)})`}
@@ -526,7 +526,7 @@ export default function TargetPage() {
                               <div className="flex items-center gap-1">
                                 <Input
                                   type="number"
-                                  step="0.1"
+                                  step="0.01"
                                   min="0"
                                   max="100"
                                   className="h-7 w-24 text-xs"

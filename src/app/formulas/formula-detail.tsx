@@ -125,20 +125,39 @@ const COMPOSITION_MATCH_WARN = 90;
 // leave remaining mass to distribute over the others.
 const MAX_REDISTRIBUTION_PASSES = 20;
 const REDISTRIBUTION_EPS = 1e-8;
-// Step grain (grams) for the mass slider/input. Redistributed masses are
+// Step grain (grams) for stored formula masses. Redistributed masses are
 // snapped to this grain so the controlled Radix slider receives stable values
 // (otherwise float-drift can cause it to oscillate and trigger React error
 // #185 — "too many re-renders").
-const MASS_STEP_G = 0.1;
+const MASS_DECIMALS = 2;
+const MASS_STEP_G = 0.01;
 
 // Snap a mass value to MASS_STEP_G. Used when redistributing across multiple
 // lines so the resulting per-line values are deterministic and slider-stable.
+function roundMass(g: number): number {
+  return Number(g.toFixed(MASS_DECIMALS));
+}
+
 function snapMass(g: number): number {
-  return Math.round(g / MASS_STEP_G) * MASS_STEP_G;
+  return roundMass(Math.round(g / MASS_STEP_G) * MASS_STEP_G);
 }
 
 function snapMassDown(g: number): number {
-  return Math.floor((g + REDISTRIBUTION_EPS) / MASS_STEP_G) * MASS_STEP_G;
+  return roundMass(Math.floor((g + REDISTRIBUTION_EPS) / MASS_STEP_G) * MASS_STEP_G);
+}
+
+function formatMassG(g: number): string {
+  return g.toFixed(MASS_DECIMALS);
+}
+
+function formatOptionalMassG(g: number | undefined, fallback: string): string {
+  return g === undefined ? fallback : formatMassG(g);
+}
+
+function formulaMassInputStep(g: number): number {
+  if (g < 5) return 0.01;
+  if (g < 50) return 0.1;
+  return 1;
 }
 
 // After running the solver, snap each unlocked line to the MASS_STEP_G grid
@@ -705,9 +724,9 @@ export default function FormulaDetailClient({ id }: { id: string }) {
         severity: Math.abs(mb.lossPct) > 10 ? "error" : "warning",
         text: (
           <span>
-            Total mass <strong>{totalMass.toFixed(1)} g</strong> deviates from
-            target <strong>{targetMassG} g</strong> by {mb.lossG > 0 ? "+" : ""}
-            {mb.lossG.toFixed(1)} g.
+            Total mass <strong>{formatMassG(totalMass)} g</strong> deviates from
+            target <strong>{formatMassG(targetMassG)} g</strong> by {mb.lossG > 0 ? "+" : ""}
+            {formatMassG(mb.lossG)} g.
           </span>
         ),
       });
@@ -725,8 +744,8 @@ export default function FormulaDetailClient({ id }: { id: string }) {
           severity: "warning",
           text: (
             <span>
-              <strong>{bName}</strong> ({b.massG.toFixed(1)} g) is heavier than
-              the line above it, <strong>{aName}</strong> ({a.massG.toFixed(1)} g).
+              <strong>{bName}</strong> ({formatMassG(b.massG)} g) is heavier than
+              the line above it, <strong>{aName}</strong> ({formatMassG(a.massG)} g).
               Either reorder the lines or rerun the solver.
             </span>
           ),
@@ -1079,7 +1098,6 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                 />
                                 <MassInput
                                   value={line.massG}
-                                  step={MASS_STEP_G}
                                   min={line.minG ?? 0}
                                   max={Number.isFinite(boundMax) ? boundMax : undefined}
                                   className="h-8 w-20 shrink-0 print:hidden"
@@ -1087,14 +1105,14 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                                   onCommit={(v) => setLineMass(idx, v)}
                                 />
                                 <span className="hidden print:block tabular-nums">
-                                  {line.massG.toFixed(1)}
+                                  {formatMassG(line.massG)}
                                 </span>
                                 {hasConstraint && (
                                   <span
                                     className="text-[10px] text-gray-500 dark:text-gray-400 print:hidden"
-                                    title={`Range: ${line.minG ?? 0}–${line.maxG ?? "∞"} g`}
+                                    title={`Range: ${formatOptionalMassG(line.minG, "0.00")}–${formatOptionalMassG(line.maxG, "∞")} g`}
                                   >
-                                    {line.minG ?? 0}–{line.maxG ?? "∞"}
+                                    {formatOptionalMassG(line.minG, "0.00")}–{formatOptionalMassG(line.maxG, "∞")}
                                   </span>
                                 )}
                               </div>
@@ -1183,14 +1201,14 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                         </td>
                         <td className="py-2 font-medium text-gray-900 dark:text-gray-100">
                           <span className={`${Math.abs(mb.lossG) > MASS_TOLERANCE_G ? (mb.lossG > 0 ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400") : ""}`}>
-                            {totalMass.toFixed(1)} g
+                            {formatMassG(totalMass)} g
                           </span>
                           {targetMassG > 0 && (
                             <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                               {mb.lossG > MASS_TOLERANCE_G
-                                ? `(+${mb.lossG.toFixed(1)} g vs target)`
+                                ? `(+${formatMassG(mb.lossG)} g vs target)`
                                 : mb.lossG < -MASS_TOLERANCE_G
-                                ? `(${mb.lossG.toFixed(1)} g vs target)`
+                                ? `(${formatMassG(mb.lossG)} g vs target)`
                                 : "(matches target)"}
                             </span>
                           )}
@@ -1409,7 +1427,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
               <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center border-t pt-1 font-medium">
                 <span>Total Mass</span>
                 <span className="text-right tabular-nums">
-                  {totalFormulaMassG(local.ingredientLines).toFixed(1)} g
+                  {formatMassG(totalFormulaMassG(local.ingredientLines))} g
                 </span>
                 {targetMassG > 0 ? (
                   (() => {
@@ -1424,7 +1442,7 @@ export default function FormulaDetailClient({ id }: { id: string }) {
                       <span className={`text-right tabular-nums text-xs ${color}`}>
                         {Math.abs(diff) <= MASS_TOLERANCE_G
                           ? "—"
-                          : `${sign}${diff.toFixed(1)} (${sign}${pct.toFixed(1)}%)`}
+                          : `${sign}${formatMassG(diff)} (${sign}${pct.toFixed(1)}%)`}
                       </span>
                     );
                   })()
@@ -1649,12 +1667,13 @@ export default function FormulaDetailClient({ id }: { id: string }) {
 // (and so backspacing the last "0" doesn't immediately repaint a "0" that
 // re-glues itself to the next character the user types — see #9). Changes
 // are finalized on blur; pressing Enter blurs the field so the displayed
-// value immediately re-syncs with the value that was actually applied.
+// value immediately re-syncs with the value that was actually applied. The
+// native spinner step is dynamic: 0.01 g below 5 g, 0.1 g below 50 g, and
+// 1 g at/above 50 g, while manual entry keeps two-decimal precision.
 function MassInput({
-  value, step, min, max, className, disabled, onCommit,
+  value, min, max, className, disabled, onCommit,
 }: {
   value: number;
-  step?: number;
   min?: number;
   max?: number;
   className?: string;
@@ -1695,6 +1714,11 @@ function MassInput({
     // it mid-edit would jump the cursor and undo what the user just typed.
     if (reformat) setDraft(String(parsed));
   }
+
+  const parsedDraft = Number(draft);
+  const step = formulaMassInputStep(
+    Number.isFinite(parsedDraft) ? parsedDraft : value
+  );
 
   return (
     <Input
@@ -2035,7 +2059,7 @@ function ConstraintDialog({
           <div className="space-y-1">
             <Label className="text-xs">Min (g)</Label>
             <Input
-              type="number" min="0" step="0.1"
+              type="number" min="0" step="0.01"
               value={minStr}
               placeholder="0"
               onChange={(e) => setMinStr(e.target.value)}
@@ -2044,7 +2068,7 @@ function ConstraintDialog({
           <div className="space-y-1">
             <Label className="text-xs">Max (g)</Label>
             <Input
-              type="number" min="0" step="0.1"
+              type="number" min="0" step="0.01"
               value={maxStr}
               placeholder="∞"
               onChange={(e) => setMaxStr(e.target.value)}
@@ -2302,7 +2326,7 @@ function RemoveIngredientDialog({
               <>This will remove {ingredientName || "the ingredient"} from the formula. The total mass will decrease accordingly.</>
             )}
             {lockTotalMass && canRemoveUnderLock && (
-              <>The total mass is locked. Removing {ingredientName || "this ingredient"} will redistribute its {line ? line.massG.toFixed(1) : ""} g over the other unlocked lines so the total stays the same.</>
+              <>The total mass is locked. Removing {ingredientName || "this ingredient"} will redistribute its {line ? formatMassG(line.massG) : ""} g over the other unlocked lines so the total stays the same.</>
             )}
             {blocked && (
               <>The total mass is locked and there&apos;s nowhere to redistribute the removed mass — it&apos;s the only unlocked line, or the others have no spare capacity. Either unlock the total mass first, or replace this ingredient with another one below.</>
