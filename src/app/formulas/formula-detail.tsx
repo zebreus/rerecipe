@@ -166,10 +166,9 @@ function formulaMassInputStep(g: number): number {
 //
 //   1. Snap every unlocked line to the grid.
 //   2. If the total is already within half a step of the budget, we're done.
-//   3. Otherwise distribute the residual from the last unlocked line backward:
-//      positive residuals are added to the last line; negative residuals are
-//      subtracted one step at a time walking backward so no line goes below
-//      zero.
+//   3. Distribute positive residual forward (last→first) respecting each
+//      line's maxG; distribute negative residual backward (last→first)
+//      respecting each line's minG (defaults to 0).
 //
 // This stops the total mass from drifting fractions of a gram each time the
 // solver is re-run (#7).
@@ -178,7 +177,7 @@ function snapToBudget(
   unlockedBudgetG: number | null
 ): FormulaLine[] {
   const snapped = lines.map((l) =>
-    l.locked ? l : { ...l, massG: Math.max(0, snapMass(l.massG)) }
+    l.locked ? l : { ...l, massG: Math.max(l.minG ?? 0, snapMass(l.massG)) }
   );
   if (unlockedBudgetG === null) return snapped;
   const unlockedIndices: number[] = [];
@@ -198,14 +197,32 @@ function snapToBudget(
   if (diff === 0) return snapped;
 
   if (diff > 0) {
-    // Add residual to the last unlocked line.
-    const last = unlockedIndices[unlockedIndices.length - 1];
-    snapped[last] = {
-      ...snapped[last],
-      massG: snapMass(snapped[last].massG + diff * MASS_STEP_G),
-    };
+    // Add residual walking backward, respecting each line's maxG so a
+    // constrained line is never pushed above its maximum.
+    let remaining = diff;
+    for (
+      let k = unlockedIndices.length - 1;
+      k >= 0 && remaining > 0;
+      k--
+    ) {
+      const idx = unlockedIndices[k];
+      const maxG = snapped[idx].maxG ?? Infinity;
+      const canAdd = Math.floor(
+        Math.max(0, maxG - snapped[idx].massG) / MASS_STEP_G
+      );
+      const toAdd = canAdd === Infinity
+        ? remaining
+        : Math.min(remaining, canAdd);
+      if (toAdd > 0) {
+        snapped[idx] = {
+          ...snapped[idx],
+          massG: snapMass(snapped[idx].massG + toAdd * MASS_STEP_G),
+        };
+        remaining -= toAdd;
+      }
+    }
   } else {
-    // Subtract the residual walking backward so no line goes below zero.
+    // Subtract the residual walking backward so no line goes below its minG.
     let remaining = -diff; // positive step count to remove
     for (
       let k = unlockedIndices.length - 1;
@@ -213,8 +230,11 @@ function snapToBudget(
       k--
     ) {
       const idx = unlockedIndices[k];
-      // Number of complete MASS_STEP_G steps available in this line.
-      const canRemove = Math.floor(snapped[idx].massG / MASS_STEP_G);
+      const minG = snapped[idx].minG ?? 0;
+      // Number of complete MASS_STEP_G steps available above the floor.
+      const canRemove = Math.floor(
+        Math.max(0, snapped[idx].massG - minG) / MASS_STEP_G
+      );
       const toRemove = Math.min(remaining, canRemove);
       if (toRemove > 0) {
         snapped[idx] = {

@@ -272,6 +272,7 @@ export default function TargetPage() {
                     id="target-mass-g"
                     value={target.targetMassG}
                     min={0}
+                    step={0.01}
                     onCommit={(v) =>
                       updateField("targetMassG", Math.max(0, v))
                     }
@@ -288,6 +289,7 @@ export default function TargetPage() {
                     id="target-volume-ml"
                     value={target.targetVolumeMl}
                     min={0}
+                    step={0.01}
                     onCommit={(v) =>
                       updateField("targetVolumeMl", Math.max(0, v))
                     }
