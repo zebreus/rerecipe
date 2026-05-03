@@ -812,7 +812,7 @@ function AddExtraNutrient({
           placeholder="e.g. Iron, Vitamin C"
         />
       </div>
-      <Button variant="outline" size="sm" onClick={commit} disabled={!canAdd}>
+      <Button variant="outline" size="sm" onClick={commit} disabled={!canAdd} aria-label="Add extra nutrient">
         <Plus className="h-4 w-4" />
       </Button>
     </div>

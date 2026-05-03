@@ -524,17 +524,18 @@ export default function TargetPage() {
                             </td>
                             <td className="py-2">
                               <div className="flex items-center gap-1">
-                                <NumberInput
-                                  step={0.1}
-                                  min={0}
-                                  max={100}
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max="100"
                                   className="h-7 w-24 text-xs"
                                   placeholder="—"
-                                  value={ti.targetPct ?? 0}
-                                  onCommit={(v) =>
+                                  value={ti.targetPct ?? ""}
+                                  onChange={(e) =>
                                     updateTargetIngredientPct(
                                       ti.ingredientId,
-                                      String(v)
+                                      e.target.value
                                     )
                                   }
                                 />
@@ -711,12 +712,18 @@ export default function TargetPage() {
 // Decide whether the configured target percentages can possibly be satisfied.
 // Targets are listed in label order — each entry's mass must be ≤ the
 // previous entry's mass. Combined with the constraint that mass percentages
-// total 100%, fixed `targetPct` values can make the system infeasible:
+// total 100%, fixed `targetPct` values can make the system infeasible in two
+// opposite ways:
 //
-//   * A fixed percentage on an early entry caps every later entry's max
-//     percentage to that value, so the maximum total is bounded above.
-//   * A fixed percentage that is larger than a previous fixed percentage
-//     contradicts the descending-order requirement.
+//   * A fixed percentage on an early entry caps every later entry's maximum
+//     percentage (via the descending-order requirement), so the *maximum*
+//     reachable total can fall below 100%.  Example: only two ingredients,
+//     first at 10% → second is bounded by 10%, max total = 20%.
+//   * An unspecified early entry that is preceded by a later fixed percentage
+//     must be at *least* as large as that later fixed value (because the list
+//     is in descending order), which raises the *minimum* reachable total
+//     above 100%.  Example: [unset, 90%] → the first must be ≥ 90%, so the
+//     minimum total is 90 + 90 = 180% > 100%.
 //
 // Returns `feasible: true` when at least one assignment of the unspecified
 // percentages can sum to 100%, `false` (with a human-readable `message`)
@@ -741,22 +748,20 @@ export function computeFeasibility(
     }
   }
 
-  // Maximum reachable total: each entry can be at most min(remaining cap,
-  // previous entry's value). Walk the list, allocating the maximum allowed
-  // to each unspecified entry; if the running total can't reach 100%,
-  // it's infeasible.
-  let runningTotal = 0;
+  // ─── Maximum reachable total ─────────────────────────────────────────────
+  // Walk forward: each entry can be at most min(previous entry's value, 100).
+  // If even the best-case assignment can't reach 100%, it's infeasible.
+  let maxTotal = 0;
   let prevMaxPct = 100;
   let usedFixed = 0;
   for (const ti of targetIngredients) {
     if (ti.targetPct !== undefined) {
-      runningTotal += ti.targetPct;
+      maxTotal += ti.targetPct;
       usedFixed += ti.targetPct;
       prevMaxPct = ti.targetPct;
     } else {
-      // Best-case: fill this entry up to prevMaxPct.
       const fill = Math.max(0, prevMaxPct);
-      runningTotal += fill;
+      maxTotal += fill;
       prevMaxPct = fill;
     }
   }
@@ -768,10 +773,34 @@ export function computeFeasibility(
     };
   }
 
-  if (runningTotal < 100 - 1e-6) {
+  if (maxTotal < 100 - 1e-6) {
     return {
       feasible: false,
-      message: `These target percentages can never sum to 100%. Even at the maximum allowed by the ingredient order, the total can only reach ${runningTotal.toFixed(1)}%.`,
+      message: `These target percentages can never sum to 100%. Even at the maximum allowed by the ingredient order, the total can only reach ${maxTotal.toFixed(1)}%.`,
+    };
+  }
+
+  // ─── Minimum reachable total ─────────────────────────────────────────────
+  // Walk backward: each unspecified entry must be at least as large as the
+  // next entry's implied minimum (because the list is in descending order).
+  // Build per-entry minimums from the tail, then check if their sum already
+  // exceeds 100%.
+  const n = targetIngredients.length;
+  const minPct = new Array<number>(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    const ti = targetIngredients[i];
+    if (ti.targetPct !== undefined) {
+      minPct[i] = ti.targetPct;
+    } else {
+      // Unspecified: must be at least as large as the entry after it.
+      minPct[i] = i + 1 < n ? minPct[i + 1] : 0;
+    }
+  }
+  const minTotal = minPct.reduce((s, x) => s + x, 0);
+  if (minTotal > 100 + 1e-6) {
+    return {
+      feasible: false,
+      message: `These target percentages require at least ${minTotal.toFixed(1)}% to satisfy the descending-order constraint, which exceeds 100%.`,
     };
   }
 

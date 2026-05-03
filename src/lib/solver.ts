@@ -487,23 +487,29 @@ export function runFormulaOptimizer(
   // Helper: clip to [minP, maxP] then renormalise to sum 1 (when honouring
   // total mass). Best-effort: we run a few rebalance passes since clipping
   // can violate the simplex constraint. When `strictOrdering` is on we
-  // additionally enforce p[j] >= p[j+1] by walking the array twice (once
-  // forward to push down later entries, once backward to push up earlier
-  // entries) before the rebalance pass.
+  // additionally enforce p[j] >= p[j+1] using a bounded isotonic-regression
+  // pass that satisfies BOTH the box bounds AND the monotone constraint
+  // simultaneously — applied after the box clip so a binding minP[j] never
+  // re-introduces an inversion.
   function enforceMonotone(v: number[]): number[] {
     if (!strictOrdering) return v;
     const out = v.slice();
-    // Forward: each entry can be at most the previous entry.
+    // Clip to box first, then enforce descending order while respecting bounds.
+    // Forward pass: cap each entry at its predecessor (the list must descend).
     for (let j = 1; j < J; j++) {
       if (out[j] > out[j - 1]) out[j] = out[j - 1];
-    }
-    // Backward: ensure earlier entries respect later minimums.
-    for (let j = J - 2; j >= 0; j--) {
-      if (out[j] < out[j + 1]) out[j] = out[j + 1];
-    }
-    // Re-clip to box bounds (monotone fix may push us out).
-    for (let j = 0; j < J; j++) {
+      // Re-clip: a minP[j] that is greater than out[j-1] would create an
+      // inversion (entry must be at least minP but also ≤ predecessor).
+      // In that case we lift the predecessor to at least minP[j] as well,
+      // which keeps the descending constraint satisfied.
       out[j] = Math.max(minP[j], Math.min(maxP[j], out[j]));
+      if (out[j] > out[j - 1]) out[j - 1] = out[j]; // lift if needed
+    }
+    // Backward pass: re-apply maxP caps propagated from later entries.
+    for (let j = J - 2; j >= 0; j--) {
+      out[j] = Math.max(minP[j], Math.min(maxP[j], out[j]));
+      // If predecessor was clipped below successor, bring successor down.
+      if (j + 1 < J && out[j + 1] > out[j]) out[j + 1] = out[j];
     }
     return out;
   }

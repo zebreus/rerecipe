@@ -143,7 +143,15 @@ function snapMassDown(g: number): number {
 
 // After running the solver, snap each unlocked line to the MASS_STEP_G grid
 // and (when a budget is supplied) make the unlocked total exactly equal that
-// budget by absorbing the rounding residual into the last unlocked line.
+// budget by absorbing the rounding residual. The algorithm is:
+//
+//   1. Snap every unlocked line to the grid.
+//   2. If the total is already within half a step of the budget, we're done.
+//   3. Otherwise distribute the residual from the last unlocked line backward:
+//      positive residuals are added to the last line; negative residuals are
+//      subtracted one step at a time walking backward so no line goes below
+//      zero.
+//
 // This stops the total mass from drifting fractions of a gram each time the
 // solver is re-run (#7).
 function snapToBudget(
@@ -164,12 +172,38 @@ function snapToBudget(
   }
   if (unlockedIndices.length === 0) return snapped;
   const targetUnlocked = snapMass(unlockedBudgetG);
-  const diff = targetUnlocked - unlockedTotal;
-  if (Math.abs(diff) < MASS_STEP_G / 2) return snapped;
-  // Apply the residual to the last unlocked line, clamping at zero.
-  const last = unlockedIndices[unlockedIndices.length - 1];
-  const adjusted = snapMass(Math.max(0, snapped[last].massG + diff));
-  snapped[last] = { ...snapped[last], massG: adjusted };
+  const diff = Math.round((targetUnlocked - unlockedTotal) / MASS_STEP_G); // integer steps
+  if (diff === 0) return snapped;
+
+  if (diff > 0) {
+    // Add residual to the last unlocked line.
+    const last = unlockedIndices[unlockedIndices.length - 1];
+    snapped[last] = {
+      ...snapped[last],
+      massG: snapMass(snapped[last].massG + diff * MASS_STEP_G),
+    };
+  } else {
+    // Subtract the residual walking backward so no line goes below zero.
+    let remaining = -diff; // positive step count to remove
+    for (
+      let k = unlockedIndices.length - 1;
+      k >= 0 && remaining > 0;
+      k--
+    ) {
+      const idx = unlockedIndices[k];
+      const canRemove = Math.floor(
+        (snapped[idx].massG + MASS_STEP_G / 2) / MASS_STEP_G
+      );
+      const toRemove = Math.min(remaining, canRemove);
+      if (toRemove > 0) {
+        snapped[idx] = {
+          ...snapped[idx],
+          massG: snapMass(snapped[idx].massG - toRemove * MASS_STEP_G),
+        };
+        remaining -= toRemove;
+      }
+    }
+  }
   return snapped;
 }
 
